@@ -1,0 +1,32 @@
+package com.sanisidro.restaurante.features.employees.model;
+
+import com.sanisidro.restaurante.core.security.model.User;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.math.BigDecimal;
+
+@Entity
+@Table(name = "employees")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Employee {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "employee_id")
+    private Long id;
+
+    @OneToOne(optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @Column(name = "position", nullable = false)
+    private String position;
+
+    private BigDecimal salario;
+
+}
