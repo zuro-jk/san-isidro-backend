@@ -5,8 +5,10 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
-public class AuthResponse {
-    private String accessToken;
-    private String refreshToken;
-    private UserProfileResponse user;
+public class ApiResponse<T> {
+
+    private boolean success;
+    private String message;
+    private T data;
+
 }

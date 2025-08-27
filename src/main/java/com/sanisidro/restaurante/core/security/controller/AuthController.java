@@ -1,21 +1,17 @@
 package com.sanisidro.restaurante.core.security.controller;
 
-import com.sanisidro.restaurante.core.security.dto.AuthResponse;
-import com.sanisidro.restaurante.core.security.dto.LoginRequest;
-import com.sanisidro.restaurante.core.security.dto.RegisterRequest;
-import com.sanisidro.restaurante.core.security.jwt.JwtService;
-import com.sanisidro.restaurante.core.security.repository.RoleRepository;
-import com.sanisidro.restaurante.core.security.repository.UserRepository;
+import com.sanisidro.restaurante.core.security.dto.*;
 import com.sanisidro.restaurante.core.security.service.AuthService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -24,16 +20,30 @@ public class AuthController {
 
     private final AuthService authService;
 
-
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<ApiResponse<AuthResponse>> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest) {
+        String clientIp = httpRequest.getRemoteAddr();
+        ApiResponse<AuthResponse> response = authService.login(request, clientIp);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/register")
-    public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
-        authService.register(request);
-        return ResponseEntity.ok("Usuario registrado exitosamente");
+    public ResponseEntity<ApiResponse<Object>> register(@Valid @RequestBody RegisterRequest request) {
+        ApiResponse<Object> response = authService.register(request);
+        return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(@Valid @RequestBody RefreshRequest request) {
+        ApiResponse<AuthResponse> response = authService.refresh(request.getRefreshToken());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Object>> logout(@Valid @RequestBody RefreshRequest request) {
+        ApiResponse<Object> response = authService.logout(request.getRefreshToken());
+        return ResponseEntity.ok(response);
+    }
 }
