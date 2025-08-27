@@ -47,6 +47,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/users/**").permitAll()
+                        .requestMatchers("/api/v1/customers/**").hasAnyRole("CLIENT", "ADMIN")
+                        .requestMatchers("/api/v1/addresses/**").hasAnyRole("CLIENT", "ADMIN")
+                        .requestMatchers("/api/v1/reservations/**").hasAnyRole("CLIENT", "WAITER", "ADMIN")
+                        .requestMatchers("/api/v1/reviews/**").hasAnyRole("CLIENT", "ADMIN")
+                        .requestMatchers("/api/v1/orders/**").hasAnyRole("WAITER", "CHEF", "CASHIER", "ADMIN")
+                        .requestMatchers("/api/v1/inventory/**").hasAnyRole("ADMIN", "CHEF")
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())

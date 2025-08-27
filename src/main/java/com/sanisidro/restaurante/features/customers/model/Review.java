@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.features.customers.model;
 
+import com.sanisidro.restaurante.features.orders.model.Order;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -21,6 +22,10 @@ public class Review {
     @ManyToOne(optional = false)
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "order_id", nullable = false)
+    private Order order;
 
     @Column(name = "comment", columnDefinition = "text")
     private String comment;

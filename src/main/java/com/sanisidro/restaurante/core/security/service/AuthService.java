@@ -119,8 +119,8 @@ public class AuthService {
             throw new EmailAlreadyExistsException("Error: email ya existe");
         }
 
-        Role defaultRole = roleRepository.findByName("ROLE_USER")
-                .orElseThrow(() -> new RuntimeException("Error: rol USER no encontrado"));
+        Role defaultRole = roleRepository.findByName("ROLE_CLIENT")
+                .orElseThrow(() -> new RuntimeException("Error: rol cliente no encontrado"));
 
         User user = User.builder()
                 .username(request.getUsername())

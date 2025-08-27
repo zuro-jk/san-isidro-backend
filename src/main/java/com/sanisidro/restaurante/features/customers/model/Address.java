@@ -1,6 +1,7 @@
 package com.sanisidro.restaurante.features.customers.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 @Entity
@@ -21,6 +22,7 @@ public class Address {
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
 
+    @NotBlank
     @Column(name = "address", columnDefinition = "text", nullable = false)
     private String address;
 
