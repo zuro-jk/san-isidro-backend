@@ -21,11 +21,19 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        roleRepository.findByName("ROLE_USER")
-                .orElseGet(() -> roleRepository.save(new Role(null, "ROLE_USER")));
+        String[] roles = {
+                "ROLE_CLIENT",
+                "ROLE_WAITER",
+                "ROLE_CHEF",
+                "ROLE_CASHIER",
+                "ROLE_ADMIN",
+                "ROLE_SUPPLIER"
+        };
 
-        roleRepository.findByName("ROLE_ADMIN")
-                .orElseGet(() -> roleRepository.save(new Role(null, "ROLE_ADMIN")));
+        for (String roleName : roles) {
+            roleRepository.findByName(roleName)
+                    .orElseGet(() -> roleRepository.save(new Role(null, roleName)));
+        }
 
         // Crear usuario admin inicial si no existe
         if (userRepository.findByUsername("admin").isEmpty()) {
@@ -34,7 +42,7 @@ public class DataInitializer implements CommandLineRunner {
             User admin = User.builder()
                     .username("admin")
                     .email("admin@example.com")
-                    .password(passwordEncoder.encode("admin123")) // contraseña inicial
+                    .password(passwordEncoder.encode("admin123"))
                     .roles(Collections.singleton(adminRole))
                     .enabled(true)
                     .build();

@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.features.customers.model;
 
+import com.sanisidro.restaurante.features.customers.enums.ReservationStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -39,6 +40,7 @@ public class Reservation {
     @Column(name = "number_of_people", nullable = false)
     private Integer numberOfPeople;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 50)
-    private String status;
+    private ReservationStatus status = ReservationStatus.PENDING;
 }
