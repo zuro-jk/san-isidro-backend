@@ -1,5 +1,8 @@
 package com.sanisidro.restaurante.features.customers.service;
 
+import com.sanisidro.restaurante.core.dto.response.PagedResponse;
+import com.sanisidro.restaurante.core.exceptions.InvalidReservationException;
+import com.sanisidro.restaurante.core.exceptions.ResourceNotFoundException;
 import com.sanisidro.restaurante.features.customers.dto.reservation.request.ReservationRequest;
 import com.sanisidro.restaurante.features.customers.dto.reservation.response.ReservationResponse;
 import com.sanisidro.restaurante.features.customers.enums.ReservationStatus;
@@ -8,10 +11,13 @@ import com.sanisidro.restaurante.features.customers.model.Reservation;
 import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
 import com.sanisidro.restaurante.features.customers.repository.ReservationRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -20,12 +26,42 @@ public class ReservationService {
     private final ReservationRepository reservationRepository;
     private final CustomerRepository customerRepository;
 
+    public ReservationResponse getReservation(Long id) {
+        return mapToResponse(reservationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation no encontrada")));
+    }
+
+    public PagedResponse<ReservationResponse> getReservationsByCustomer(Long customerId, Pageable pageable) {
+        Page<Reservation> page = reservationRepository.findByCustomerId(customerId, pageable);
+        List<ReservationResponse> content = page.getContent()
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+
+        return new PagedResponse<>(
+                content,
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast()
+        );
+    }
+
     public ReservationResponse createReservation(ReservationRequest dto) {
-        Customer customer = null;
-        if (dto.getCustomerId() != null) {
-            customer = customerRepository.findById(dto.getCustomerId())
-                    .orElseThrow(() -> new RuntimeException("Customer not found"));
+        // Validación de duplicado
+        if (reservationRepository.existsByCustomer_IdAndReservationDateAndReservationTime(
+                dto.getCustomerId(), dto.getReservationDate(), dto.getReservationTime())) {
+            throw new InvalidReservationException("El cliente ya tiene una reserva para esta fecha y hora");
         }
+
+        Customer customer = customerRepository.findById(dto.getCustomerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado"));
+
+        validateReservationFields(dto);
+
+        // Convertimos status String a Enum de forma segura
+        ReservationStatus status = dto.getStatus() != null ? dto.getStatus() : ReservationStatus.PENDING;
 
         Reservation reservation = Reservation.builder()
                 .customer(customer)
@@ -34,41 +70,38 @@ public class ReservationService {
                 .reservationDate(dto.getReservationDate())
                 .reservationTime(dto.getReservationTime())
                 .numberOfPeople(dto.getNumberOfPeople())
-                .status(dto.getStatus() != null ? dto.getStatus() : ReservationStatus.PENDING)
+                .status(status)
                 .build();
 
         return mapToResponse(reservationRepository.save(reservation));
     }
 
-    public ReservationResponse getReservation(Long id) {
-        return mapToResponse(reservationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Reservation not found")));
-    }
-
-    public List<ReservationResponse> getReservationsByCustomer(Long customerId) {
-        return reservationRepository.findByCustomerId(customerId)
-                .stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
-
     public ReservationResponse updateReservation(Long id, ReservationRequest dto) {
         Reservation reservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Reservation not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation no encontrada"));
 
-        if (dto.getReservationDate() != null) reservation.setReservationDate(dto.getReservationDate());
-        if (dto.getReservationTime() != null) reservation.setReservationTime(dto.getReservationTime());
-        if (dto.getNumberOfPeople() != null) reservation.setNumberOfPeople(dto.getNumberOfPeople());
-        if (dto.getStatus() != null) reservation.setStatus(dto.getStatus());
-        if (dto.getContactName() != null) reservation.setContactName(dto.getContactName());
-        if (dto.getContactPhone() != null) reservation.setContactPhone(dto.getContactPhone());
+        Customer customer = customerRepository.findById(dto.getCustomerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado"));
+
+        validateReservationFields(dto);
+
+        // Asignamos los campos
+        reservation.setCustomer(customer);
+        reservation.setContactName(dto.getContactName());
+        reservation.setContactPhone(dto.getContactPhone());
+        reservation.setReservationDate(dto.getReservationDate());
+        reservation.setReservationTime(dto.getReservationTime());
+        reservation.setNumberOfPeople(dto.getNumberOfPeople());
+
+        // Validación de enum aplicada desde DTO, si es null usamos PENDING
+        reservation.setStatus(dto.getStatus() != null ? dto.getStatus() : ReservationStatus.PENDING);
 
         return mapToResponse(reservationRepository.save(reservation));
     }
 
     public void deleteReservation(Long id) {
         if (!reservationRepository.existsById(id)) {
-            throw new RuntimeException("Reservation not found");
+            throw new ResourceNotFoundException("Reservation no encontrada");
         }
         reservationRepository.deleteById(id);
     }
@@ -84,5 +117,17 @@ public class ReservationService {
                 .numberOfPeople(reservation.getNumberOfPeople())
                 .status(reservation.getStatus())
                 .build();
+    }
+
+    private void validateReservationFields(ReservationRequest dto) {
+        if (dto.getNumberOfPeople() <= 0) {
+            throw new InvalidReservationException("El número de personas debe ser mayor a 0");
+        }
+
+        if (dto.getReservationDate().isBefore(LocalDate.now()) ||
+                (dto.getReservationDate().isEqual(LocalDate.now()) &&
+                        dto.getReservationTime().isBefore(LocalTime.now()))) {
+            throw new InvalidReservationException("La fecha y hora de la reserva no puede estar en el pasado");
+        }
     }
 }

@@ -12,7 +12,10 @@ import java.time.LocalDateTime;
 @Builder
 public class ReviewRequest {
 
+    @NotNull(message = "Orden es obligatorio")
     private Long orderId;
+
+    @NotNull(message = "Cliente es obligatorio")
     private Long customerId;
 
     @NotBlank(message = "Comentario es obligatorio")

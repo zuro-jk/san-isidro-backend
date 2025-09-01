@@ -1,6 +1,7 @@
 package com.sanisidro.restaurante.features.customers.dto.address.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
@@ -11,6 +12,7 @@ import lombok.*;
 @Builder
 public class AddressRequest {
 
+    @NotNull(message = "El cliente es obligatorio")
     private Long customerId;
 
     @NotBlank(message = "Address is required")
