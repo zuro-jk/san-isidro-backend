@@ -1,6 +1,7 @@
 package com.sanisidro.restaurante.features.customers.model;
 
 import com.sanisidro.restaurante.features.customers.enums.ReservationStatus;
+import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -42,6 +43,10 @@ public class Reservation {
 
     @Column(name = "number_of_people", nullable = false)
     private Integer numberOfPeople;
+
+    @ManyToOne
+    @JoinColumn(name = "table_id", nullable = false)
+    private TableEntity table;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 50)

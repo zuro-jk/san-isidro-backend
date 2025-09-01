@@ -17,6 +17,9 @@ public class ReservationRequest {
     @NotNull(message = "Cliente es obligatorio")
     private Long customerId;
 
+    @NotNull(message = "Mesa es obligatoria")
+    private Long tableId;
+
     @NotBlank(message = "Nombre de contacto es obligatorio")
     @Size(max = 100, message = "Nombre de contacto no debe exceder los 100 caracteres")
     private String contactName;
