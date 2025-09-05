@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.features.suppliers.model;
 
+import com.sanisidro.restaurante.features.suppliers.enums.PurchaseOrderStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -29,12 +30,23 @@ public class PurchaseOrder {
     @Column(name = "date", nullable = false)
     private LocalDateTime date;
 
-    @Column(name = "status", length = 50)
-    private String status;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20, nullable = false)
+    @Builder.Default
+    private PurchaseOrderStatus status = PurchaseOrderStatus.PENDING;
 
     @Column(name = "total", precision = 10, scale = 2, nullable = false)
     private BigDecimal total;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private Set<PurchaseOrderDetail> details = new LinkedHashSet<>();
+
+    public void replaceDetails(Set<PurchaseOrderDetail> newDetails) {
+        this.details.clear();
+        for (PurchaseOrderDetail d : newDetails) {
+            d.setOrder(this);
+            this.details.add(d);
+        }
+    }
 }

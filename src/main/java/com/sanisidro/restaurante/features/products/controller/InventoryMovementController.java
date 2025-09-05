@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/inventory-movements")
+@RequestMapping("/api/v1/inventory-movements")
 @RequiredArgsConstructor
 public class InventoryMovementController {
 
