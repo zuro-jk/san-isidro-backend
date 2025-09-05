@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: san_isidro_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: TheKing
+      POSTGRES_DB: san_isidro
+    ports:
+      - "5433:5432"
+    volumes:
+      - san_isidro_data:/var/lib/postgresql/data
+
+volumes:
+  san_isidro_data:
