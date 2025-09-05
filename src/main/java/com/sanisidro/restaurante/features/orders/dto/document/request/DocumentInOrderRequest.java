@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Data
 public class DocumentInOrderRequest {
 
-    private Long id; // opcional para updates
+    private Long id;
 
     @NotNull(message = "El tipo de documento es obligatorio")
     @Size(max = 20, message = "El tipo de documento no puede superar los 20 caracteres")
@@ -22,7 +22,7 @@ public class DocumentInOrderRequest {
     @Size(max = 50, message = "El número de documento no puede superar los 50 caracteres")
     private String number;
 
-    private LocalDateTime date; // si no se envía, se asigna LocalDateTime.now()
+    private LocalDateTime date;
 
     @NotNull(message = "El monto del documento es obligatorio")
     @DecimalMin(value = "0.01", message = "El monto debe ser mayor a cero")

@@ -44,20 +44,20 @@ public class OrderService {
     private final DocumentService documentService;
     private final PaymentService paymentService;
 
-    public List<OrderResponse> getAll() {
+    public List<OrderResponse> getAll(String lang) {
         return orderRepository.findAll().stream()
-                .map(this::mapToResponse)
+                .map(order -> mapToResponse(order, lang))
                 .toList();
     }
 
-    public OrderResponse getById(Long id) {
+    public OrderResponse getById(Long id, String lang) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Orden no encontrada con id: " + id));
-        return mapToResponse(order);
+        return mapToResponse(order, lang);
     }
 
     @Transactional
-    public OrderResponse create(OrderRequest request) {
+    public OrderResponse create(OrderRequest request, String lang) {
         Customer customer = customerRepository.findById(request.getCustomerId())
                 .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado con id: " + request.getCustomerId()));
 
@@ -87,23 +87,34 @@ public class OrderService {
                 .status(status)
                 .type(type)
                 .total(BigDecimal.ZERO)
+                .details(new LinkedHashSet<>())
+                .payments(new LinkedHashSet<>())
+                .documents(new LinkedHashSet<>())
                 .build();
 
         Set<OrderDetail> details = new LinkedHashSet<>();
+        BigDecimal total = BigDecimal.ZERO;
+
         for (OrderDetailInOrderRequest d : request.getDetails()) {
             Product product = productRepository.findById(d.getProductId())
                     .orElseThrow(() -> new EntityNotFoundException("Producto no encontrado con id: " + d.getProductId()));
+
+            BigDecimal priceWithTax = product.getPrice()
+                    .multiply(BigDecimal.valueOf(1.18)); // aplica IGV
 
             OrderDetail detail = OrderDetail.builder()
                     .order(order)
                     .product(product)
                     .quantity(d.getQuantity())
-                    .unitPrice(d.getUnitPrice())
+                    .unitPrice(priceWithTax) // aquí ya incluyes IGV
                     .build();
 
             details.add(detail);
+
+            total = total.add(priceWithTax.multiply(BigDecimal.valueOf(d.getQuantity())));
         }
-        order.getDetails().addAll(details);
+        order.setDetails(details);
+        order.setTotal(total);
 
         if (request.getPayments() != null) {
             request.getPayments().forEach(p -> paymentService.createInOrder(order, p));
@@ -113,16 +124,11 @@ public class OrderService {
             request.getDocuments().forEach(d -> documentService.createInOrder(order, d));
         }
 
-        BigDecimal total = details.stream()
-                .map(d -> d.getUnitPrice().multiply(BigDecimal.valueOf(d.getQuantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        order.setTotal(total);
-
-        return mapToResponse(orderRepository.save(order));
+        return mapToResponse(orderRepository.save(order), lang);
     }
 
     @Transactional
-    public OrderResponse update(Long id, OrderRequest request) {
+    public OrderResponse update(Long id, OrderRequest request, String lang) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Orden no encontrada con id: " + id));
 
@@ -154,21 +160,40 @@ public class OrderService {
         order.setType(type);
         order.setDate(LocalDateTime.now());
 
-        order.getDetails().clear();
-        Set<OrderDetail> details = new LinkedHashSet<>();
+        Set<OrderDetail> updatedDetails = new LinkedHashSet<>();
+        BigDecimal total = BigDecimal.ZERO;
+
         for (OrderDetailInOrderRequest d : request.getDetails()) {
             Product product = productRepository.findById(d.getProductId())
                     .orElseThrow(() -> new EntityNotFoundException("Producto no encontrado con id: " + d.getProductId()));
 
-            OrderDetail detail = OrderDetail.builder()
-                    .order(order)
-                    .product(product)
-                    .quantity(d.getQuantity())
-                    .unitPrice(d.getUnitPrice())
-                    .build();
-            details.add(detail);
+            BigDecimal priceWithTax = product.getPrice().multiply(BigDecimal.valueOf(1.18));
+
+            OrderDetail existingDetail = order.getDetails().stream()
+                    .filter(detail -> detail.getProduct().getId().equals(product.getId()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (existingDetail != null) {
+                existingDetail.setQuantity(d.getQuantity());
+                existingDetail.setUnitPrice(priceWithTax);
+                updatedDetails.add(existingDetail);
+            } else {
+                OrderDetail newDetail = OrderDetail.builder()
+                        .order(order)
+                        .product(product)
+                        .quantity(d.getQuantity())
+                        .unitPrice(priceWithTax)
+                        .build();
+                updatedDetails.add(newDetail);
+            }
+
+            total = total.add(priceWithTax.multiply(BigDecimal.valueOf(d.getQuantity())));
         }
-        order.getDetails().addAll(details);
+
+        order.getDetails().clear();
+        order.getDetails().addAll(updatedDetails);
+        order.setTotal(total);
 
         order.getPayments().clear();
         if (request.getPayments() != null) {
@@ -180,12 +205,7 @@ public class OrderService {
             request.getDocuments().forEach(d -> documentService.createInOrder(order, d));
         }
 
-        BigDecimal total = order.getDetails().stream()
-                .map(d -> d.getUnitPrice().multiply(BigDecimal.valueOf(d.getQuantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        order.setTotal(total);
-
-        return mapToResponse(orderRepository.save(order));
+        return mapToResponse(orderRepository.save(order), lang);
     }
 
     public void delete(Long id) {
@@ -195,7 +215,7 @@ public class OrderService {
         orderRepository.deleteById(id);
     }
 
-    private OrderResponse mapToResponse(Order order) {
+    private OrderResponse mapToResponse(Order order, String lang) {
         return OrderResponse.builder()
                 .id(order.getId())
                 .customerId(order.getCustomer().getId())
@@ -206,9 +226,9 @@ public class OrderService {
                 .addressDescription(order.getAddress() != null ? order.getAddress().getDescription() : null)
                 .date(order.getDate())
                 .statusId(order.getStatus().getId())
-                .statusName(order.getStatus().getName())
+                .statusName(getStatusName(order.getStatus(), lang))
                 .typeId(order.getType().getId())
-                .typeName(order.getType().getName())
+                .typeName(getTypeName(order.getType(), lang))
                 .total(order.getTotal())
                 .details(order.getDetails().stream()
                         .map(d -> OrderDetailInOrderResponse.builder()
@@ -220,6 +240,22 @@ public class OrderService {
                                 .build())
                         .toList())
                 .build();
+    }
+
+    private String getStatusName(OrderStatus status, String lang) {
+        return status.getTranslations().stream()
+                .filter(t -> t.getLang().equalsIgnoreCase(lang))
+                .map(t -> t.getName())
+                .findFirst()
+                .orElse("Sin nombre");
+    }
+
+    private String getTypeName(OrderType type, String lang) {
+        return type.getTranslations().stream()
+                .filter(t -> t.getLang().equalsIgnoreCase(lang))
+                .map(t -> t.getName())
+                .findFirst()
+                .orElse("Sin nombre");
     }
 
 }

@@ -3,12 +3,15 @@ package com.sanisidro.restaurante.features.orders.service;
 import com.sanisidro.restaurante.features.orders.dto.orderstatus.request.OrderStatusRequest;
 import com.sanisidro.restaurante.features.orders.dto.orderstatus.response.OrderStatusResponse;
 import com.sanisidro.restaurante.features.orders.model.OrderStatus;
+import com.sanisidro.restaurante.features.orders.model.OrderStatusTranslation;
 import com.sanisidro.restaurante.features.orders.repository.OrderStatusRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -17,31 +20,52 @@ public class OrderStatusService {
     private final OrderStatusRepository orderStatusRepository;
 
 
-    public List<OrderStatusResponse> getAll() {
+    public List<OrderStatusResponse> getAll(String lang) {
         return orderStatusRepository.findAll().stream()
-                .map(this::mapToResponse)
-                .toList();
+                .map(status -> mapToResponse(status, lang))
+                .collect(Collectors.toList());
     }
 
-    public OrderStatusResponse getById(Long id) {
+    public OrderStatusResponse getById(Long id, String lang) {
         return orderStatusRepository.findById(id)
-                .map(this::mapToResponse)
+                .map(status -> mapToResponse(status, lang))
                 .orElseThrow(() -> new EntityNotFoundException("Estado de orden no encontrado con id: " + id));
     }
 
     public OrderStatusResponse create(OrderStatusRequest request) {
         OrderStatus status = OrderStatus.builder()
-                .name(request.getName())
+                .code(request.getCode())
                 .build();
-        return mapToResponse(orderStatusRepository.save(status));
+
+        OrderStatusTranslation translation = OrderStatusTranslation.builder()
+                .orderStatus(status)
+                .lang(request.getLang())
+                .name(request.getName())
+                .description(request.getDescription())
+                .build();
+
+        status.getTranslations().add(translation);
+
+        return mapToResponse(orderStatusRepository.save(status), request.getLang());
     }
 
     public OrderStatusResponse update(Long id, OrderStatusRequest request) {
         OrderStatus status = orderStatusRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Estado de orden no encontrado con id: " + id));
 
-        status.setName(request.getName());
-        return mapToResponse(orderStatusRepository.save(status));
+        OrderStatusTranslation translation = status.getTranslations().stream()
+                .filter(t -> t.getLang().equals(request.getLang()))
+                .findFirst()
+                .orElse(OrderStatusTranslation.builder()
+                        .orderStatus(status)
+                        .lang(request.getLang())
+                        .build());
+
+        translation.setName(request.getName());
+        translation.setDescription(request.getDescription());
+        status.getTranslations().add(translation);
+
+        return mapToResponse(orderStatusRepository.save(status), request.getLang());
     }
 
     public void delete(Long id) {
@@ -51,10 +75,18 @@ public class OrderStatusService {
         orderStatusRepository.deleteById(id);
     }
 
-    private OrderStatusResponse mapToResponse(OrderStatus status) {
+    private OrderStatusResponse mapToResponse(OrderStatus status, String lang) {
+        OrderStatusTranslation translation = status.getTranslations().stream()
+                .filter(t -> t.getLang().equals(lang))
+                .findFirst()
+                .orElseThrow(() -> new EntityNotFoundException("Traducción no encontrada para el idioma: " + lang));
+
         return OrderStatusResponse.builder()
                 .id(status.getId())
-                .name(status.getName())
+                .code(status.getCode())
+                .name(translation.getName())
+                .description(translation.getDescription())
+                .lang(translation.getLang())
                 .build();
     }
 

@@ -4,6 +4,7 @@ import com.sanisidro.restaurante.core.security.dto.ApiResponse;
 import com.sanisidro.restaurante.features.orders.dto.payment.request.PaymentRequest;
 import com.sanisidro.restaurante.features.orders.dto.payment.response.PaymentResponse;
 import com.sanisidro.restaurante.features.orders.service.PaymentService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,12 +29,12 @@ public class PaymentController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<PaymentResponse>> create(@RequestBody PaymentRequest request) {
+    public ResponseEntity<ApiResponse<PaymentResponse>> create(@RequestBody @Valid PaymentRequest request) {
         return ResponseEntity.ok(new ApiResponse<>(true, "Pago creado", paymentService.create(request)));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<PaymentResponse>> update(@PathVariable Long id, @RequestBody PaymentRequest request) {
+    public ResponseEntity<ApiResponse<PaymentResponse>> update(@PathVariable Long id, @RequestBody @Valid PaymentRequest request) {
         return ResponseEntity.ok(new ApiResponse<>(true, "Pago actualizado", paymentService.update(id, request)));
     }
 

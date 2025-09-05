@@ -20,27 +20,34 @@ public class OrderController {
     private final OrderService orderService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<OrderResponse>>> getAll() {
-        List<OrderResponse> orders = orderService.getAll();
+    public ResponseEntity<ApiResponse<List<OrderResponse>>> getAll(
+            @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang) {
+        List<OrderResponse> orders = orderService.getAll(lang);
         return ResponseEntity.ok(new ApiResponse<>(true, "Órdenes obtenidas correctamente", orders));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<OrderResponse>> getById(@PathVariable Long id) {
-        OrderResponse order = orderService.getById(id);
+    public ResponseEntity<ApiResponse<OrderResponse>> getById(
+            @PathVariable Long id,
+            @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang) {
+        OrderResponse order = orderService.getById(id, lang);
         return ResponseEntity.ok(new ApiResponse<>(true, "Orden obtenida correctamente", order));
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<OrderResponse>> create(@Valid @RequestBody OrderRequest request) {
-        OrderResponse order = orderService.create(request);
+    public ResponseEntity<ApiResponse<OrderResponse>> create(
+            @Valid @RequestBody OrderRequest request,
+            @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang) {
+        OrderResponse order = orderService.create(request, lang);
         return ResponseEntity.ok(new ApiResponse<>(true, "Orden creada correctamente", order));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<OrderResponse>> update(@PathVariable Long id,
-                                                             @Valid @RequestBody OrderRequest request) {
-        OrderResponse order = orderService.update(id, request);
+    public ResponseEntity<ApiResponse<OrderResponse>> update(
+            @PathVariable Long id,
+            @Valid @RequestBody OrderRequest request,
+            @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang) {
+        OrderResponse order = orderService.update(id, request, lang);
         return ResponseEntity.ok(new ApiResponse<>(true, "Orden actualizada correctamente", order));
     }
 

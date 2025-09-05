@@ -106,7 +106,7 @@ public class PaymentService {
                 .id(payment.getId())
                 .orderId(payment.getOrder().getId())
                 .paymentMethodId(payment.getPaymentMethod().getId())
-                .paymentMethodName(payment.getPaymentMethod().getName())
+                .paymentMethodName(payment.getPaymentMethod().getCode())
                 .amount(payment.getAmount())
                 .date(payment.getDate())
                 .isOnline(payment.getIsOnline())

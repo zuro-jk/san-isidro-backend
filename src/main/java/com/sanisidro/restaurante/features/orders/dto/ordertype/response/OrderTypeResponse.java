@@ -7,5 +7,8 @@ import lombok.Data;
 @Builder
 public class OrderTypeResponse {
     private Long id;
+    private String code;
     private String name;
+    private String description;
+    private String lang;
 }

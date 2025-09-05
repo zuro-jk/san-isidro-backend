@@ -20,24 +20,37 @@ public class PaymentMethodController {
     private final PaymentMethodService paymentMethodService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<PaymentMethodResponse>>> getAll() {
-        return ResponseEntity.ok(new ApiResponse<>(true, "Lista de métodos de pago", paymentMethodService.getAll()));
+    public ResponseEntity<ApiResponse<List<PaymentMethodResponse>>> getAll(
+            @RequestParam(value = "lang", required = false, defaultValue = "es") String lang) {
+        return ResponseEntity.ok(
+                new ApiResponse<>(true, "Lista de métodos de pago", paymentMethodService.getAll(lang))
+        );
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<PaymentMethodResponse>> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(new ApiResponse<>(true, "Método de pago encontrado", paymentMethodService.getById(id)));
+    public ResponseEntity<ApiResponse<PaymentMethodResponse>> getById(
+            @PathVariable Long id,
+            @RequestParam(value = "lang", required = false, defaultValue = "es") String lang) {
+        return ResponseEntity.ok(
+                new ApiResponse<>(true, "Método de pago encontrado", paymentMethodService.getById(id, lang))
+        );
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<PaymentMethodResponse>> create(@Valid @RequestBody PaymentMethodRequest request) {
-        return ResponseEntity.ok(new ApiResponse<>(true, "Método de pago creado", paymentMethodService.create(request)));
+    public ResponseEntity<ApiResponse<PaymentMethodResponse>> create(
+            @Valid @RequestBody PaymentMethodRequest request) {
+        return ResponseEntity.ok(
+                new ApiResponse<>(true, "Método de pago creado", paymentMethodService.create(request))
+        );
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<PaymentMethodResponse>> update(@PathVariable Long id,
-                                                                     @Valid @RequestBody PaymentMethodRequest request) {
-        return ResponseEntity.ok(new ApiResponse<>(true, "Método de pago actualizado", paymentMethodService.update(id, request)));
+    public ResponseEntity<ApiResponse<PaymentMethodResponse>> update(
+            @PathVariable Long id,
+            @Valid @RequestBody PaymentMethodRequest request) {
+        return ResponseEntity.ok(
+                new ApiResponse<>(true, "Método de pago actualizado", paymentMethodService.update(id, request))
+        );
     }
 
     @DeleteMapping("/{id}")

@@ -7,5 +7,7 @@ import lombok.Data;
 @Builder
 public class PaymentMethodResponse {
     private Long id;
-    private String name;
+    private String code; // identificador interno
+    private String name; // nombre traducido según el idioma solicitado
+    private String description; // descripción traducida
 }

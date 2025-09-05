@@ -1,6 +1,8 @@
 package com.sanisidro.restaurante.features.orders.model;
 
 import com.sanisidro.restaurante.core.security.model.User;
+import com.sanisidro.restaurante.features.orders.enums.IncidentStatus;
+import com.sanisidro.restaurante.features.orders.enums.IncidentType;
 import com.sanisidro.restaurante.features.products.model.Product;
 import com.sanisidro.restaurante.features.suppliers.model.Supplier;
 import jakarta.persistence.*;
@@ -38,8 +40,9 @@ public class Incident {
     @JoinColumn(name = "supplier_id")
     private Supplier supplier;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "type", length = 50)
-    private String type;
+    private IncidentType type;
 
     @Column(name = "description", columnDefinition = "text")
     private String description;
@@ -47,6 +50,8 @@ public class Incident {
     @Column(name = "date", nullable = false)
     private LocalDateTime date;
 
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 50)
-    private String status;
+    private IncidentStatus status;
 }

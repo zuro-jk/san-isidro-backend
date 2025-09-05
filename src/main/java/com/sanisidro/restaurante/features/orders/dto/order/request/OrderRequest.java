@@ -5,6 +5,7 @@ import com.sanisidro.restaurante.features.orders.dto.document.request.DocumentRe
 import com.sanisidro.restaurante.features.orders.dto.orderdetail.request.OrderDetailInOrderRequest;
 import com.sanisidro.restaurante.features.orders.dto.payment.request.PaymentInOrderRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -26,7 +27,7 @@ public class OrderRequest {
     @NotNull(message = "El tipo de orden es obligatorio")
     private Long typeId;
 
-    @NotNull(message = "Los detalles de la orden son obligatorios")
+    @NotEmpty(message = "La orden debe contener al menos un detalle")
     @Valid
     private List<@Valid OrderDetailInOrderRequest> details;
 
