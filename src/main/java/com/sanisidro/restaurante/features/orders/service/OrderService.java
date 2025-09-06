@@ -1,5 +1,8 @@
 package com.sanisidro.restaurante.features.orders.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sanisidro.restaurante.core.kafka.message.KafkaMessage;
+import com.sanisidro.restaurante.core.kafka.producer.KafkaProducerService;
 import com.sanisidro.restaurante.features.customers.model.Address;
 import com.sanisidro.restaurante.features.customers.model.Customer;
 import com.sanisidro.restaurante.features.customers.repository.AddressRepository;
@@ -7,6 +10,7 @@ import com.sanisidro.restaurante.features.customers.repository.CustomerRepositor
 import com.sanisidro.restaurante.features.employees.model.Employee;
 import com.sanisidro.restaurante.features.employees.repository.EmployeeRepository;
 import com.sanisidro.restaurante.features.orders.dto.order.request.OrderRequest;
+import com.sanisidro.restaurante.features.orders.dto.order.response.OrderCreatedEvent;
 import com.sanisidro.restaurante.features.orders.dto.order.response.OrderResponse;
 import com.sanisidro.restaurante.features.orders.dto.orderdetail.request.OrderDetailInOrderRequest;
 import com.sanisidro.restaurante.features.orders.dto.orderdetail.response.OrderDetailInOrderResponse;
@@ -43,6 +47,9 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final DocumentService documentService;
     private final PaymentService paymentService;
+
+    private final KafkaProducerService kafkaProducerService;
+    private final ObjectMapper objectMapper;
 
     public List<OrderResponse> getAll(String lang) {
         return orderRepository.findAll().stream()
@@ -100,13 +107,13 @@ public class OrderService {
                     .orElseThrow(() -> new EntityNotFoundException("Producto no encontrado con id: " + d.getProductId()));
 
             BigDecimal priceWithTax = product.getPrice()
-                    .multiply(BigDecimal.valueOf(1.18)); // aplica IGV
+                    .multiply(BigDecimal.valueOf(1.18));
 
             OrderDetail detail = OrderDetail.builder()
                     .order(order)
                     .product(product)
                     .quantity(d.getQuantity())
-                    .unitPrice(priceWithTax) // aquí ya incluyes IGV
+                    .unitPrice(priceWithTax)
                     .build();
 
             details.add(detail);
@@ -124,7 +131,11 @@ public class OrderService {
             request.getDocuments().forEach(d -> documentService.createInOrder(order, d));
         }
 
-        return mapToResponse(orderRepository.save(order), lang);
+        Order savedOrder = orderRepository.save(order);
+
+        publishOrderCreatedEvent(savedOrder);
+
+        return mapToResponse(savedOrder, lang);
     }
 
     @Transactional
@@ -240,6 +251,34 @@ public class OrderService {
                                 .build())
                         .toList())
                 .build();
+    }
+
+    private void publishOrderCreatedEvent(Order savedOrder) {
+        try {
+            OrderCreatedEvent event = OrderCreatedEvent.builder()
+                    .orderId(savedOrder.getId())
+                    .customerId(savedOrder.getCustomer().getId())
+                    .customerName(savedOrder.getCustomer().getUser().getFullName())
+                    .customerEmail(savedOrder.getCustomer().getUser().getEmail())
+                    .total(savedOrder.getTotal())
+                    .createdAt(savedOrder.getDate())
+                    .productNames(savedOrder.getDetails().stream()
+                            .map(d -> d.getProduct().getName())
+                            .toList())
+                    .build();
+
+            String payload = objectMapper.writeValueAsString(event);
+
+            kafkaProducerService.sendMessage(
+                    KafkaMessage.builder()
+                            .topic("orders")
+                            .key(savedOrder.getId().toString())
+                            .payload(payload)
+                            .build()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("Error serializando evento de orden", e);
+        }
     }
 
     private String getStatusName(OrderStatus status, String lang) {

@@ -1,11 +1,14 @@
 spring:
+  config:
+    import: optional:file:.env.properties[.properties]
+
   application:
     name: san-isidro-restaurant
 
   datasource:
     url: jdbc:postgresql://localhost:5433/san_isidro
-    username: postgres
-    password: TheKing
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -16,10 +19,30 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
-#  flyway:
-#    enabled: true
-#    locations: classpath:db/migration
-#    baseline-on-migrate: true
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${EMAIL_USERNAME}
+    password: ${EMAIL_PASSWORD}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.ssl.trust: smtp.gmail.com
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+    default-encoding: UTF-8
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: san-isidro-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
 app:
   jwt:
