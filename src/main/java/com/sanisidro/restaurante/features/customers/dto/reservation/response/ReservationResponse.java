@@ -16,6 +16,8 @@ public class ReservationResponse {
 
     private Long customerId;
 
+    private Long tableId;
+
     private String contactName;
 
     private String contactPhone;

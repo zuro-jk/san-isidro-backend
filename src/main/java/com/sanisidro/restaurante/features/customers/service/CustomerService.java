@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.features.customers.service;
 
+import com.sanisidro.restaurante.core.exceptions.ResourceNotFoundException;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
 import com.sanisidro.restaurante.features.customers.dto.customer.request.CustomerRequest;
@@ -21,7 +22,7 @@ public class CustomerService {
 
     public CustomerResponse createCustomer(CustomerRequest dto) {
         User user = userRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
 
         Customer customer = Customer.builder()
                 .user(user)
@@ -34,7 +35,7 @@ public class CustomerService {
 
     public CustomerResponse getCustomer(Long id) {
         Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado"));
         return mapToResponse(customer);
     }
 
@@ -47,7 +48,7 @@ public class CustomerService {
 
     public CustomerResponse updateCustomer(Long id, CustomerRequest dto) {
         Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
 
         customer.setPoints(dto.getPoints() != null ? dto.getPoints() : customer.getPoints());
         Customer updated = customerRepository.save(customer);
@@ -55,6 +56,9 @@ public class CustomerService {
     }
 
     public void deleteCustomer(Long id) {
+        if (!customerRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Customer not found");
+        }
         customerRepository.deleteById(id);
     }
 

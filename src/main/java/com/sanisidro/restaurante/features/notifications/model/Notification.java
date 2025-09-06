@@ -1,19 +1,20 @@
 package com.sanisidro.restaurante.features.notifications.model;
 
 import com.sanisidro.restaurante.core.security.model.User;
+import com.sanisidro.restaurante.features.notifications.enums.NotificationStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "notifications")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class Notification {
+@MappedSuperclass
+@SuperBuilder
+public abstract class Notification {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,13 +25,11 @@ public class Notification {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "message", columnDefinition = "text", nullable = false)
-    private String message;
-
-    @Column(name = "sent_at", nullable = false)
+    @Column(name = "sent_at")
     private LocalDateTime sentAt;
 
-    @Column(name = "status", length = 50)
-    private String status;
+    @Column(name = "status", length = 50, nullable = false)
+    @Enumerated(EnumType.STRING)
+    private NotificationStatus status;
 
 }

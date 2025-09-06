@@ -28,4 +28,11 @@ public class Address {
 
     @Column(name = "reference", columnDefinition = "text")
     private String reference;
+
+    public String getDescription() {
+        if (reference != null && !reference.isBlank()) {
+            return address + " (" + reference + ")";
+        }
+        return address;
+    }
 }

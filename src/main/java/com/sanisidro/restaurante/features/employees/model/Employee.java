@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.features.employees.model;
 
+import com.sanisidro.restaurante.core.model.Auditable;
 import com.sanisidro.restaurante.core.security.model.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -13,7 +14,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Employee {
+public class Employee extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,6 +28,7 @@ public class Employee {
     @Column(name = "position", nullable = false)
     private String position;
 
-    private BigDecimal salario;
+
+    private BigDecimal salary;
 
 }

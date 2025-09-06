@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.features.customers.service;
 
+import com.sanisidro.restaurante.core.exceptions.ResourceNotFoundException;
 import com.sanisidro.restaurante.features.customers.dto.address.request.AddressRequest;
 import com.sanisidro.restaurante.features.customers.dto.address.response.AddressResponse;
 import com.sanisidro.restaurante.features.customers.model.Address;
@@ -21,7 +22,7 @@ public class AddressService {
 
     public AddressResponse createAddress(AddressRequest dto) {
         Customer customer = customerRepository.findById(dto.getCustomerId())
-                .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado"));
 
         Address address = Address.builder()
                 .customer(customer)
@@ -34,7 +35,7 @@ public class AddressService {
 
     public AddressResponse getAddress(Long id) {
         return mapToResponse(addressRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Dirección no encontrada")));
+                .orElseThrow(() -> new ResourceNotFoundException("Dirección no encontrada")));
     }
 
     public List<AddressResponse> getAddressesByCustomer(Long customerId) {
@@ -46,7 +47,7 @@ public class AddressService {
 
     public AddressResponse updateAddress(Long id, AddressRequest dto) {
         Address address = addressRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Dirección no encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Dirección no encontrada"));
 
         if (dto.getAddress() != null) address.setAddress(dto.getAddress());
         if (dto.getReference() != null) address.setReference(dto.getReference());
@@ -56,7 +57,7 @@ public class AddressService {
 
     public void deleteAddress(Long id) {
         if (!addressRepository.existsById(id)) {
-            throw new RuntimeException("Address not found");
+            throw new ResourceNotFoundException("Address not found");
         }
         addressRepository.deleteById(id);
     }
