@@ -19,5 +19,16 @@ public class OrderCreatedEvent {
     private String customerEmail;
     private BigDecimal total;
     private LocalDateTime createdAt;
-    private List<String> productNames;
+    private List<ProductInfo> products;
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class ProductInfo {
+        private String name;
+        private BigDecimal unitPrice;
+        private int quantity;
+    }
 }

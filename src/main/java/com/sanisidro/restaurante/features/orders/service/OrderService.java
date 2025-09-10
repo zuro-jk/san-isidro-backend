@@ -262,8 +262,12 @@ public class OrderService {
                     .customerEmail(savedOrder.getCustomer().getUser().getEmail())
                     .total(savedOrder.getTotal())
                     .createdAt(savedOrder.getDate())
-                    .productNames(savedOrder.getDetails().stream()
-                            .map(d -> d.getProduct().getName())
+                    .products(savedOrder.getDetails().stream()
+                            .map(d -> OrderCreatedEvent.ProductInfo.builder()
+                                    .name(d.getProduct().getName())
+                                    .unitPrice(d.getUnitPrice())
+                                    .quantity(d.getQuantity())
+                                    .build())
                             .toList())
                     .build();
 

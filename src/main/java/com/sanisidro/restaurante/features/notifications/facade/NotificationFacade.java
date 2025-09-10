@@ -12,7 +12,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class NotificationFacade {
 
-private final Map<String, NotificationChannel> channels;
+    private final Map<String, NotificationChannel> channels;
 
     public void processNotification(NotificationEvent event) {
         NotificationChannel channel = channels.get(event.getType().toUpperCase());

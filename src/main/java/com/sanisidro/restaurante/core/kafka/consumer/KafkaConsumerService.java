@@ -26,7 +26,7 @@ public class KafkaConsumerService {
 
         try {
             NotificationEvent event = objectMapper.readValue(record.value(), NotificationEvent.class);
-            notificationFacade.processNotification(event); // <--- aquí la magia
+            notificationFacade.processNotification(event);
         } catch (Exception e) {
             logger.error("❌ Error al procesar el mensaje de Kafka", e);
         }
