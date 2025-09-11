@@ -46,6 +46,15 @@ public class User implements UserDetails {
     @Column
     private String verificationCode;
 
+    @Column(unique = true)
+    private String googleId;
+
+    @Column(unique = true)
+    private String facebookId;
+
+    @Column(unique = true)
+    private String githubId;
+
     @Column
     private boolean isGoogleUser = false;
 
