@@ -35,10 +35,19 @@ public class User implements UserDetails {
     @Column(unique = true, nullable = false)
     private String email;
 
-    @Column(nullable = false)
+    @Column
     private String password;
 
     private boolean enabled = true;
+
+    @Column(nullable = false)
+    private boolean emailVerified = false;
+
+    @Column
+    private String verificationCode;
+
+    @Column
+    private boolean isGoogleUser = false;
 
     @Builder.Default
     @ManyToMany(fetch = FetchType.EAGER)

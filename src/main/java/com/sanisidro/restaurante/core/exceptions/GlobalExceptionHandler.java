@@ -1,5 +1,8 @@
 package com.sanisidro.restaurante.core.exceptions;
 
+import com.sanisidro.restaurante.core.aws.exception.AccessDeniedException;
+import com.sanisidro.restaurante.core.aws.exception.FileNotFoundException;
+import com.sanisidro.restaurante.core.aws.exception.FileUploadException;
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -19,6 +22,21 @@ public class GlobalExceptionHandler {
     private ResponseEntity<ApiResponse<Object>> buildResponse(String message, HttpStatus status) {
         return ResponseEntity.status(status)
                 .body(new ApiResponse<>(false, message, null));
+    }
+
+    @ExceptionHandler(FileNotFoundException.class)
+    public ResponseEntity<ApiResponse<Object>> handleFileNotFound(FileNotFoundException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(FileUploadException.class)
+    public ResponseEntity<ApiResponse<Object>> handleFileUpload(FileUploadException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleFileAccessDenied(AccessDeniedException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.FORBIDDEN);
     }
 
     @ExceptionHandler({

@@ -45,6 +45,7 @@ public class ProductService {
                 .name(request.getName())
                 .price(request.getPrice())
                 .category(category)
+                .imageUrl(request.getImageUrl())
                 .build();
 
         return mapToResponse(productRepository.save(product));
@@ -60,6 +61,7 @@ public class ProductService {
         product.setName(request.getName());
         product.setPrice(request.getPrice());
         product.setCategory(category);
+        product.setImageUrl(request.getImageUrl());
 
         return mapToResponse(productRepository.save(product));
     }
@@ -78,6 +80,7 @@ public class ProductService {
                 .price(product.getPrice())
                 .categoryId(product.getCategory().getId())
                 .categoryName(product.getCategory().getName())
+                .imageUrl(product.getImageUrl())
                 .build();
     }
 }
