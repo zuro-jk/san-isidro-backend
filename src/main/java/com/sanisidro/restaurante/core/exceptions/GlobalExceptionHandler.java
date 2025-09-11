@@ -8,6 +8,8 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -22,6 +24,15 @@ public class GlobalExceptionHandler {
     private ResponseEntity<ApiResponse<Object>> buildResponse(String message, HttpStatus status) {
         return ResponseEntity.status(status)
                 .body(new ApiResponse<>(false, message, null));
+    }
+
+    @ExceptionHandler(OAuth2AuthenticationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleOAuth2Exception(OAuth2AuthenticationException ex) {
+        ex.printStackTrace(); // log completo en consola
+        OAuth2Error error = ex.getError();
+        String errorDescription = error.getDescription() != null ? error.getDescription() : error.getErrorCode();
+        String message = "OAuth2 Authentication failed: " + errorDescription;
+        return buildResponse(message, HttpStatus.UNAUTHORIZED);
     }
 
     @ExceptionHandler(FileNotFoundException.class)
