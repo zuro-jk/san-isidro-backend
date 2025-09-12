@@ -1,20 +1,18 @@
 package com.sanisidro.restaurante.core.security.dto;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Set;
+import java.io.Serializable;
+import java.time.Instant;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class UserProfileResponse {
+public class BlacklistedToken implements Serializable {
+    private String token;
     private String username;
-    private String email;
-    private boolean enabled;
-    private Set<String> roles;
-
+    private Instant revokedAt;
+    private String reason;
 }

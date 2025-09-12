@@ -1,6 +1,7 @@
 package com.sanisidro.restaurante.core.security.jwt;
 
 import com.sanisidro.restaurante.core.security.service.CustomUserDetailsService;
+import com.sanisidro.restaurante.core.security.service.TokenBlacklistService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,6 +23,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final CustomUserDetailsService userDetailsService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -57,6 +59,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         if (token == null || token.isEmpty()) {
             chain.doFilter(request, response);
+            return;
+        }
+
+        if (tokenBlacklistService.isBlacklisted(token)) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return;
         }
 

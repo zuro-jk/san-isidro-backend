@@ -92,4 +92,10 @@ public class JwtService {
     public String extractSubject(String token) {
         return extractUsername(token);
     }
+
+    public long getExpirationMillis(String token) {
+        Date expirationDate = extractExpiration(token);
+        long now = System.currentTimeMillis();
+        return Math.max(expirationDate.getTime() - now, 0);
+    }
 }

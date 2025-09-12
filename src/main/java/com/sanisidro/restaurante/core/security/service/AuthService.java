@@ -37,6 +37,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     private final int MAX_ATTEMPTS_USER  = 5;
     private final int MAX_ATTEMPTS_IP = 10;
@@ -136,7 +137,7 @@ public class AuthService {
     }
 
     @Transactional
-    public ApiResponse<AuthResponse> refresh(String refreshTokenStr) {
+    public ApiResponse<AuthResponse> refresh(String refreshTokenStr, String clientIp, String userAgent) {
         RefreshToken refreshToken = refreshTokenRepository.findByToken(refreshTokenStr)
                 .orElseThrow(() -> new InvalidRefreshTokenException("Refresh token no válido"));
 
@@ -146,6 +147,8 @@ public class AuthService {
         }
 
         User user = refreshToken.getUser();
+
+        tokenBlacklistService.blacklistToken(refreshToken.getToken(), user.getUsername(), "refresh", refreshTokenExpiration, clientIp, userAgent);
 
         String newAccessToken = jwtService.generateAccessToken(user.getUsername(), Collections.emptyMap());
         refreshTokenRepository.delete(refreshToken);
@@ -164,11 +167,16 @@ public class AuthService {
     }
 
     @Transactional
-    public ApiResponse<Object> logout(String refreshTokenStr) {
+    public ApiResponse<Object> logout(String refreshTokenStr, String accessToken, String clientIp, String userAgent) {
         refreshTokenRepository.deleteByToken(refreshTokenStr);
+
+        long expirationMillis = jwtService.getExpirationMillis(accessToken);
+        String username = jwtService.extractUsername(accessToken);
+
+        tokenBlacklistService.blacklistToken(accessToken, username, "logout", expirationMillis, clientIp, userAgent);
+
         return new ApiResponse<>(true, "Logout exitoso", null);
     }
-
 
     @Transactional
     private RefreshToken createRefreshToken(User user) {
@@ -185,6 +193,24 @@ public class AuthService {
         refreshTokenRepository.deleteAllByUser(user);
     }
 
+    @Transactional
+    public ApiResponse<Object> logoutAll(String accessToken, String clientIp, String userAgent) {
+        if (!jwtService.validate(accessToken)) {
+            throw new InvalidRefreshTokenException("Access token no válido o expirado");
+        }
 
+        String username = jwtService.extractUsername(accessToken);
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
+
+        revokeAllRefreshTokens(user);
+
+        long expirationMillis = jwtService.getExpirationMillis(accessToken);
+
+        tokenBlacklistService.blacklistToken(accessToken, username, "logout_all", expirationMillis, clientIp, userAgent);
+
+        return new ApiResponse<>(true, "Sesiones cerradas en todos los dispositivos", null);
+    }
 
 }
