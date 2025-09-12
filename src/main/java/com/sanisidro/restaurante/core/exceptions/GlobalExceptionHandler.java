@@ -62,7 +62,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({
             UsernameAlreadyExistsException.class,
             EmailAlreadyExistsException.class,
-            DuplicateReservationException.class
+            DuplicateReservationException.class,
+            CustomerAlreadyExistsException.class
     })
     public ResponseEntity<ApiResponse<Object>> handleConflict(RuntimeException ex) {
         return buildResponse(ex.getMessage(), HttpStatus.CONFLICT);
@@ -70,7 +71,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({
             InvalidReservationException.class,
-            BadRequestException.class
+            BadRequestException.class,
+            InvalidPointsOperationException.class
     })
     public ResponseEntity<ApiResponse<Object>> handleBadRequest(RuntimeException ex) {
         return buildResponse(ex.getMessage(), HttpStatus.BAD_REQUEST);

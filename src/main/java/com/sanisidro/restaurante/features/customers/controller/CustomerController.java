@@ -1,10 +1,17 @@
 package com.sanisidro.restaurante.features.customers.controller;
 
+import com.sanisidro.restaurante.core.dto.response.PagedResponse;
+import com.sanisidro.restaurante.core.security.dto.ApiResponse;
 import com.sanisidro.restaurante.features.customers.dto.customer.request.CustomerRequest;
 import com.sanisidro.restaurante.features.customers.dto.customer.response.CustomerResponse;
+import com.sanisidro.restaurante.features.customers.dto.pointshistory.response.PointsHistoryResponse;
+import com.sanisidro.restaurante.features.customers.model.PointsHistory;
 import com.sanisidro.restaurante.features.customers.service.CustomerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,31 +25,63 @@ public class CustomerController {
 
     private final CustomerService customerService;
 
-    @GetMapping("/{id}")
-    public ResponseEntity<CustomerResponse> getCustomer(@PathVariable Long id) {
-        return ResponseEntity.ok(customerService.getCustomer(id));
+    @GetMapping
+    public ResponseEntity<ApiResponse<PagedResponse<CustomerResponse>>> getAllCustomers(Pageable pageable) {
+        PagedResponse<CustomerResponse> response = customerService.getAllCustomers(pageable);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Clientes obtenidos correctamente", response));
     }
 
-    @GetMapping
-    public ResponseEntity<List<CustomerResponse>> getAllCustomers() {
-        return ResponseEntity.ok(customerService.getAllCustomers());
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<CustomerResponse>> getCustomer(@PathVariable Long id) {
+        CustomerResponse customer = customerService.getCustomer(id);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Cliente obtenido correctamente", customer));
+    }
+
+    @GetMapping("/{id}/points")
+    public ResponseEntity<ApiResponse<Integer>> getPoints(@PathVariable Long id) {
+        int points = customerService.getPoints(id);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Puntos obtenidos correctamente", points));
+    }
+
+    @GetMapping("/{id}/points/history")
+    public ResponseEntity<ApiResponse<PagedResponse<PointsHistoryResponse>>> getPointsHistory(
+            @PathVariable Long id, Pageable pageable) {
+        PagedResponse<PointsHistoryResponse> history = customerService.getPointsHistory(id, pageable);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Historial de puntos obtenido correctamente", history));
     }
 
     @PostMapping
-    public ResponseEntity<CustomerResponse> createCustomer(@Valid @RequestBody CustomerRequest dto) {
-        return new ResponseEntity<>(customerService.createCustomer(dto), HttpStatus.CREATED);
+    public ResponseEntity<ApiResponse<CustomerResponse>> createCustomer(@Valid @RequestBody CustomerRequest dto) {
+        CustomerResponse customer = customerService.createCustomer(dto);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new ApiResponse<>(true, "Cliente creado correctamente", customer));
+    }
+
+    @PostMapping("/{id}/points/add")
+    public ResponseEntity<ApiResponse<CustomerResponse>> addPoints(
+            @PathVariable Long id, @RequestParam int points) {
+        CustomerResponse customer = customerService.addPoints(id, points);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Puntos agregados correctamente", customer));
+    }
+
+    @PostMapping("/{id}/points/subtract")
+    public ResponseEntity<ApiResponse<CustomerResponse>> subtractPoints(
+            @PathVariable Long id, @RequestParam int points) {
+        CustomerResponse customer = customerService.subtractPoints(id, points);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Puntos restados correctamente", customer));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<CustomerResponse> updateCustomer(
-            @PathVariable Long id,
-            @Valid @RequestBody CustomerRequest dto) {
-        return ResponseEntity.ok(customerService.updateCustomer(id, dto));
+    public ResponseEntity<ApiResponse<CustomerResponse>> updateCustomer(
+            @PathVariable Long id, @Valid @RequestBody CustomerRequest dto) {
+        CustomerResponse customer = customerService.updateCustomer(id, dto);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Cliente actualizado correctamente", customer));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteCustomer(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> deleteCustomer(@PathVariable Long id) {
         customerService.deleteCustomer(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(new ApiResponse<>(true, "Cliente eliminado correctamente", null));
     }
+
 }

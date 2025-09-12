@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.features.customers.model;
 
+import com.sanisidro.restaurante.core.model.Auditable;
 import com.sanisidro.restaurante.core.security.model.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -14,12 +15,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Customer {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "customer_id")
-    private Long id;
+public class Customer extends Auditable {
 
     @OneToOne(optional = false)
     @JoinColumn(name = "user_id", nullable = false)

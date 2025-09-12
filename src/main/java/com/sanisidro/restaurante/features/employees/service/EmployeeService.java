@@ -85,7 +85,7 @@ public class EmployeeService {
                 .orElseThrow(() -> new EntityNotFoundException("Empleado no encontrado con id: " + id));
 
         Employee oldState = Employee.builder()
-                .id(employee.getId())
+                // .id(employee.getId())
                 .user(employee.getUser())
                 .position(employee.getPosition())
                 .salary(employee.getSalary())

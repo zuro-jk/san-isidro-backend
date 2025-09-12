@@ -28,6 +28,7 @@ public class ReservationService {
     private final ReservationRepository reservationRepository;
     private final CustomerRepository customerRepository;
     private final TableRepository tableRepository;
+    private final LoyaltyService loyaltyService;
 
     public ReservationResponse getReservation(Long id) {
         return mapToResponse(reservationRepository.findById(id)
@@ -74,6 +75,34 @@ public class ReservationService {
                 .build();
 
         return mapToResponse(reservationRepository.save(reservation));
+    }
+
+    public ReservationResponse completeReservation(Long reservationId) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Reserva no encontrada"));
+
+        if (reservation.getStatus() == ReservationStatus.CANCELLED) {
+            throw new InvalidReservationException("No se puede completar una reserva cancelada");
+        }
+
+        if (reservation.getStatus() == ReservationStatus.COMPLETED) {
+            throw new InvalidReservationException("La reserva ya ha sido completada");
+        }
+
+        reservation.setStatus(ReservationStatus.COMPLETED);
+        reservationRepository.save(reservation);
+
+        int numberOfPeople = reservation.getNumberOfPeople();
+
+        // TODO: Agregar evento de reservar que si asistio
+//        loyaltyService.applyLoyaltyRules(
+//                reservation.getCustomer(),
+//                null,
+//                "RESERVA_COMPLETADA",
+//                numberOfPeople
+//        );
+
+        return mapToResponse(reservation);
     }
 
     public ReservationResponse updateReservation(Long id, ReservationRequest dto) {

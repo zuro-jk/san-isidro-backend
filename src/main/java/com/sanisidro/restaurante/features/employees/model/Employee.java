@@ -16,11 +16,6 @@ import java.math.BigDecimal;
 @Builder
 public class Employee extends Auditable {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "employee_id")
-    private Long id;
-
     @OneToOne(optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
