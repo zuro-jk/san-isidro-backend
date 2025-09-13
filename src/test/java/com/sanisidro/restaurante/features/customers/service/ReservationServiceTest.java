@@ -94,7 +94,7 @@ class ReservationServiceTest {
                 });
 
         // when
-        var response = reservationService.createAutoWalkInReservation(1L, 3);
+        var response = reservationService.createAutoWalkInReservation(1L, 3, false);
 
         // then
         assertNotNull(response);
@@ -109,6 +109,6 @@ class ReservationServiceTest {
         when(tableRepository.findAll()).thenReturn(List.of());
 
         assertThrows(InvalidReservationException.class,
-                () -> reservationService.createAutoWalkInReservation(1L, 5));
+                () -> reservationService.createAutoWalkInReservation(1L, 5, false));
     }
 }

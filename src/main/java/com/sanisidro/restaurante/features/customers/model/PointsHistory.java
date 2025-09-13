@@ -1,7 +1,9 @@
 package com.sanisidro.restaurante.features.customers.model;
 
+import com.sanisidro.restaurante.features.customers.enums.PointHistoryEventType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -14,7 +16,6 @@ import java.time.LocalDateTime;
 @Builder
 public class PointsHistory {
 
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -26,10 +27,12 @@ public class PointsHistory {
     @Column(nullable = false)
     private Integer points;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String event;
+    private PointHistoryEventType event;
 
-    @Column(nullable = false)
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
 }

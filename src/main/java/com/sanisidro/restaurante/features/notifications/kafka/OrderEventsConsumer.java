@@ -1,9 +1,10 @@
 package com.sanisidro.restaurante.features.notifications.kafka;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sanisidro.restaurante.features.notifications.dto.NotificationEvent;
+import com.sanisidro.restaurante.features.notifications.dto.OrderNotificationEvent;
 import com.sanisidro.restaurante.features.notifications.facade.NotificationFacade;
 import com.sanisidro.restaurante.features.orders.dto.order.response.OrderCreatedEvent;
+import com.sanisidro.restaurante.features.notifications.templates.EmailTemplateBuilder;
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
@@ -30,9 +31,9 @@ public class OrderEventsConsumer {
         try {
             OrderCreatedEvent event = objectMapper.readValue(record.value(), OrderCreatedEvent.class);
 
-            NotificationEvent notification = NotificationEvent.builder()
+            // Convertir evento de dominio a evento de notificación
+            OrderNotificationEvent notification = OrderNotificationEvent.builder()
                     .userId(event.getCustomerId())
-                    .type("EMAIL")
                     .recipient(event.getCustomerEmail())
                     .subject("¡Tu orden #" + event.getOrderId() + " ha sido confirmada!")
                     .products(mapProducts(event))
@@ -50,13 +51,13 @@ public class OrderEventsConsumer {
         }
     }
 
-    private List<NotificationEvent.OrderProduct> mapProducts(OrderCreatedEvent event) {
+    private List<EmailTemplateBuilder.OrderProduct> mapProducts(OrderCreatedEvent event) {
         return event.getProducts().stream()
-                .map(p -> NotificationEvent.OrderProduct.builder()
-                        .name(p.getName())
-                        .quantity(p.getQuantity())
-                        .unitPrice(p.getUnitPrice() != null ? p.getUnitPrice() : BigDecimal.ZERO)
-                        .build())
+                .map(p -> new EmailTemplateBuilder.OrderProduct(
+                        p.getName(),
+                        p.getUnitPrice() != null ? p.getUnitPrice() : BigDecimal.ZERO,
+                        p.getQuantity()
+                ))
                 .collect(Collectors.toList());
     }
 }

@@ -26,6 +26,15 @@ public class TableEntity {
     @Column(name = "capacity", nullable = false)
     private Integer capacity;
 
+    @Column(name = "min_capacity", nullable = false)
+    private Integer minCapacity;
+
+    @Column(name = "optimal_capacity", nullable = false)
+    private Integer optimalCapacity;
+
+    @Column(name = "priority", nullable = false)
+    private Integer priority;
+
     @Column(name = "description")
     private String description;
 
@@ -47,4 +56,19 @@ public class TableEntity {
     @Column(name = "status", nullable = false)
     @Enumerated(EnumType.STRING)
     private TableStatus status;
+
+    /**
+     * Verifica si la mesa puede recibir la cantidad de personas indicada.
+     */
+    public boolean canAccommodate(int numberOfPeople) {
+        return numberOfPeople >= minCapacity && numberOfPeople <= capacity;
+    }
+
+    /**
+     * Indica si la mesa es ideal para la cantidad de personas (para asignación automática).
+     */
+    public boolean isOptimalFor(int numberOfPeople) {
+        return numberOfPeople <= optimalCapacity;
+    }
+
 }

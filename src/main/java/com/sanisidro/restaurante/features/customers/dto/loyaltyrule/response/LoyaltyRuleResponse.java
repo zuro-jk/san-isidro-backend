@@ -1,9 +1,11 @@
 package com.sanisidro.restaurante.features.customers.dto.loyaltyrule.response;
 
+import com.sanisidro.restaurante.features.customers.enums.LoyaltyRuleType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 
 @Data
 @AllArgsConstructor
@@ -17,4 +19,5 @@ public class LoyaltyRuleResponse {
     private Double minPurchaseAmount;
     private Boolean active;
     private Boolean perPerson;
+    private LoyaltyRuleType type;
 }

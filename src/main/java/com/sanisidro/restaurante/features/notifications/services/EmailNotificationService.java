@@ -4,13 +4,16 @@ import com.sanisidro.restaurante.core.email.dto.request.EmailMessageRequest;
 import com.sanisidro.restaurante.core.email.service.EmailService;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
-import com.sanisidro.restaurante.features.notifications.dto.NotificationEvent;
+import com.sanisidro.restaurante.features.notifications.dto.NotifiableEvent;
+import com.sanisidro.restaurante.features.notifications.dto.OrderNotificationEvent;
+import com.sanisidro.restaurante.features.notifications.dto.ReservationNotificationEvent;
 import com.sanisidro.restaurante.features.notifications.enums.NotificationStatus;
 import com.sanisidro.restaurante.features.notifications.metrics.NotificationMetricsService;
 import com.sanisidro.restaurante.features.notifications.model.EmailNotification;
 import com.sanisidro.restaurante.features.notifications.repository.EmailNotificationRepository;
 import com.sanisidro.restaurante.features.notifications.templates.EmailTemplateBuilder;
 import com.sanisidro.restaurante.features.notifications.templates.EmailTemplateBuilder.OrderProduct;
+import com.sanisidro.restaurante.features.notifications.templates.ReservationEmailTemplateBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,55 +33,21 @@ public class EmailNotificationService implements NotificationChannel {
     private final NotificationMetricsService notificationMetricsService;
 
     @Override
-    public void send(NotificationEvent event) {
-        String recipient = event.getRecipient();
-        Long userId = event.getUserId();
-        User user = null;
+    public void send(NotifiableEvent event) {
+        User user = resolveUser(event);
+        String recipient = resolveRecipient(event, user);
 
-        if (userId != null) {
-            user = userRepository.findById(userId).orElse(null);
-            if (recipient == null || recipient.isBlank()) {
-                recipient = user != null ? user.getEmail() : null;
-            }
-        }
-
-        if (recipient == null || recipient.isBlank()) {
-            log.warn("⚠️ Notificación fallida: no hay destinatario válido para userId={}", userId);
-            notificationMetricsService.incrementFailed("EMAIL", "no_recipient");
-            saveFailedEmail(event, user);
+        if (recipient == null) {
+            handleFailed(event, user, "no_recipient");
             return;
         }
 
-        if (event.getSubject() == null || event.getSubject().isBlank() ||
-                event.getMessage() == null || event.getMessage().isBlank()) {
-            log.warn("⚠️ Notificación fallida: asunto o cuerpo vacío para userId={}", userId);
-            notificationMetricsService.incrementFailed("EMAIL", "invalid_content");
-            saveFailedEmail(event, user);
+        if (isInvalidContent(event)) {
+            handleFailed(event, user, "invalid_content");
             return;
         }
 
-        String emailHtml;
-        if (event.getProducts() != null && !event.getProducts().isEmpty()) {
-            List<OrderProduct> products = event.getProducts().stream()
-                    .map(p -> new OrderProduct(p.getName(), p.getUnitPrice(), p.getQuantity()))
-                    .collect(Collectors.toList());
-
-            emailHtml = EmailTemplateBuilder.buildOrderConfirmationEmail(
-                    user != null ? user.getFullName() : "Cliente",
-                    event.getOrderId(),
-                    products,
-                    event.getTotal(),
-                    event.getOrderDate(),
-                    event.getActionUrl() != null ? event.getActionUrl() : "#",
-                    event.getLogoUrl()
-            );
-        } else {
-            emailHtml = EmailTemplateBuilder.buildPromotionEmail(
-                    event.getSubject(),
-                    event.getMessage(),
-                    event.getActionUrl() != null ? event.getActionUrl() : "#"
-            );
-        }
+        String emailHtml = buildEmailHtml(event, user);
 
         EmailNotification email = EmailNotification.builder()
                 .toAddress(recipient)
@@ -90,53 +59,32 @@ public class EmailNotificationService implements NotificationChannel {
                 .build();
 
         emailNotificationRepository.save(email);
-
         sendWithRetries(email, recipient, emailHtml);
     }
 
-    private void sendWithRetries(EmailNotification email, String recipient, String emailHtml) {
-        try {
-            EmailMessageRequest request = EmailMessageRequest.builder()
-                    .toAddress(recipient)
-                    .subject(email.getSubject())
-                    .body(emailHtml)
-                    .build();
-
-            int attempts = 0;
-            boolean sent = false;
-            while (attempts < 3 && !sent) {
-                try {
-                    emailService.sendEmail(request);
-                    sent = true;
-                    email.setStatus(NotificationStatus.SENT);
-                    notificationMetricsService.incrementSent("EMAIL");
-                    log.info("📧 Notificación enviada a {} en intento #{}", recipient, attempts + 1);
-                } catch (Exception ex) {
-                    attempts++;
-                    log.warn("⚠️ Intento #{} fallido para {}: {}", attempts, recipient, ex.getMessage());
-                    if (attempts == 3) {
-                        email.setStatus(NotificationStatus.FAILED);
-                        notificationMetricsService.incrementFailed("EMAIL", "smtp_error");
-                        log.error("❌ No se pudo enviar el correo a {} después de 3 intentos", recipient, ex);
-                    }
-                    Thread.sleep(1000);
-                }
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.error("❌ Interrupción en reintentos de email para {}", recipient, e);
-            email.setStatus(NotificationStatus.FAILED);
-            notificationMetricsService.incrementFailed("EMAIL", "interrupted");
-        } catch (Exception e) {
-            log.error("❌ Error inesperado al enviar email a {}: {}", recipient, e.getMessage(), e);
-            email.setStatus(NotificationStatus.FAILED);
-            notificationMetricsService.incrementFailed("EMAIL", "unexpected_error");
-        } finally {
-            emailNotificationRepository.save(email);
+    private User resolveUser(NotifiableEvent event) {
+        if (event.getUserId() != null) {
+            return userRepository.findById(event.getUserId()).orElse(null);
         }
+        return null;
     }
 
-    private void saveFailedEmail(NotificationEvent event, User user) {
+    private String resolveRecipient(NotifiableEvent event, User user) {
+        if (event.getRecipient() != null && !event.getRecipient().isBlank()) {
+            return event.getRecipient();
+        }
+        return user != null ? user.getEmail() : null;
+    }
+
+    private boolean isInvalidContent(NotifiableEvent event) {
+        return event.getSubject() == null || event.getSubject().isBlank() ||
+                event.getMessage() == null || event.getMessage().isBlank();
+    }
+
+    private void handleFailed(NotifiableEvent event, User user, String reason) {
+        log.warn("⚠️ Notificación fallida: {} para userId={}", reason, event.getUserId());
+        notificationMetricsService.incrementFailed("EMAIL", reason);
+
         EmailNotification failedEmail = EmailNotification.builder()
                 .toAddress(event.getRecipient())
                 .subject(event.getSubject())
@@ -145,6 +93,70 @@ public class EmailNotificationService implements NotificationChannel {
                 .status(NotificationStatus.FAILED)
                 .user(user)
                 .build();
+
         emailNotificationRepository.save(failedEmail);
+    }
+
+    private String buildEmailHtml(NotifiableEvent event, User user) {
+        String recipientName = user != null ? user.getFullName() : "Cliente";
+
+        if (event instanceof OrderNotificationEvent orderEvent) {
+            List<OrderProduct> products = orderEvent.getProducts() != null
+                    ? orderEvent.getProducts().stream()
+                    .map(p -> new OrderProduct(p.getName(), p.getUnitPrice(), p.getQuantity()))
+                    .collect(Collectors.toList())
+                    : List.of(); // Evita NPE si es null
+
+            return EmailTemplateBuilder.buildOrderConfirmationEmail(
+                    recipientName,
+                    orderEvent.getOrderId(),
+                    products,
+                    orderEvent.getTotal(),
+                    orderEvent.getOrderDate(),
+                    orderEvent.getActionUrl() != null ? orderEvent.getActionUrl() : "#",
+                    orderEvent.getMessage() // mensaje opcional
+            );
+
+        } else if (event instanceof ReservationNotificationEvent reservationEvent) {
+            return ReservationEmailTemplateBuilder.buildReservationConfirmationEmail(reservationEvent);
+
+        } else {
+            // Para otros tipos, como promociones
+            return EmailTemplateBuilder.buildPromotionEmail(
+                    event.getSubject(),
+                    event.getMessage(),
+                    event.getActionUrl() != null ? event.getActionUrl() : "#"
+            );
+        }
+    }
+
+    private void sendWithRetries(EmailNotification email, String recipient, String emailHtml) {
+        int attempts = 0;
+        boolean sent = false;
+
+        while (attempts < 3 && !sent) {
+            try {
+                emailService.sendEmail(EmailMessageRequest.builder()
+                        .toAddress(recipient)
+                        .subject(email.getSubject())
+                        .body(emailHtml)
+                        .build());
+                sent = true;
+                email.setStatus(NotificationStatus.SENT);
+                notificationMetricsService.incrementSent("EMAIL");
+                log.info("📧 Notificación enviada a {} en intento #{}", recipient, attempts + 1);
+            } catch (Exception ex) {
+                attempts++;
+                log.warn("⚠️ Intento #{} fallido para {}: {}", attempts, recipient, ex.getMessage());
+                if (attempts == 3) {
+                    email.setStatus(NotificationStatus.FAILED);
+                    notificationMetricsService.incrementFailed("EMAIL", "smtp_error");
+                    log.error("❌ No se pudo enviar el correo a {} después de 3 intentos", recipient, ex);
+                }
+                try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+            }
+        }
+
+        emailNotificationRepository.save(email);
     }
 }

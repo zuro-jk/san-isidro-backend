@@ -1,15 +1,21 @@
 package com.sanisidro.restaurante.features.customers.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sanisidro.restaurante.core.dto.response.PagedResponse;
 import com.sanisidro.restaurante.core.exceptions.InvalidReservationException;
 import com.sanisidro.restaurante.core.exceptions.ResourceNotFoundException;
+import com.sanisidro.restaurante.core.kafka.message.KafkaMessage;
+import com.sanisidro.restaurante.core.kafka.producer.KafkaProducerService;
 import com.sanisidro.restaurante.features.customers.dto.reservation.request.ReservationRequest;
 import com.sanisidro.restaurante.features.customers.dto.reservation.response.ReservationResponse;
+import com.sanisidro.restaurante.features.customers.enums.PointHistoryEventType;
 import com.sanisidro.restaurante.features.customers.enums.ReservationStatus;
 import com.sanisidro.restaurante.features.customers.model.Customer;
+import com.sanisidro.restaurante.features.customers.model.PointsHistory;
 import com.sanisidro.restaurante.features.customers.model.Reservation;
 import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
 import com.sanisidro.restaurante.features.customers.repository.ReservationRepository;
+import com.sanisidro.restaurante.features.notifications.dto.ReservationNotificationEvent;
 import com.sanisidro.restaurante.features.restaurant.enums.TableStatus;
 import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
 import com.sanisidro.restaurante.features.restaurant.repository.TableRepository;
@@ -36,6 +42,10 @@ public class ReservationService {
     private final CustomerRepository customerRepository;
     private final TableRepository tableRepository;
     private final LoyaltyService loyaltyService;
+    private final PointsHistoryService pointsHistoryService;
+
+    private final KafkaProducerService kafkaProducerService;
+    private final ObjectMapper objectMapper;
 
     private static final ZoneId RESTAURANT_ZONE = ZoneId.of("America/Lima");
 
@@ -48,8 +58,16 @@ public class ReservationService {
     @Transactional
     public ReservationResponse createReservation(ReservationRequest dto) {
         Customer customer = findCustomerById(dto.getCustomerId());
-        TableEntity table = findTableById(dto.getTableId());
+        TableEntity table;
 
+        if (dto.getTableId() == null) {
+            table = findBestTableForNumberOfPeople(dto.getNumberOfPeople(), dto.getReservationDate(), dto.getReservationTime());
+            dto.setTableId(table.getId());
+        } else {
+            table = findTableById(dto.getTableId());
+        }
+
+        // Validar siempre la reserva
         validateReservationFields(dto, table, null, false);
 
         Reservation reservation = Reservation.builder()
@@ -60,8 +78,8 @@ public class ReservationService {
 
         reservation.updateFromDto(dto, customer, table);
         Reservation saved = reservationRepository.save(reservation);
+        publishReservationNotification(saved, "creada");
 
-        // Marcar mesa ocupada si es confirmada
         if (saved.getStatus() == ReservationStatus.CONFIRMED) {
             table.setStatus(TableStatus.OCCUPIED);
             tableRepository.save(table);
@@ -75,36 +93,61 @@ public class ReservationService {
     }
 
     @Transactional
-    public ReservationResponse createWalkInReservation(Long customerId, Long tableId, int numberOfPeople) {
+    public ReservationResponse createWalkInReservation(Long customerId, Long tableId, int numberOfPeople, boolean sendEmail) {
         Customer customer = findCustomerById(customerId);
-        TableEntity table = findTableById(tableId);
 
+        TableEntity table;
         ZonedDateTime now = ZonedDateTime.now(RESTAURANT_ZONE).truncatedTo(ChronoUnit.MINUTES);
+        LocalTime startTime;
+
+        if (tableId == null) {
+            // Para walk-in sin mesa específica, buscamos la mejor disponible
+            table = findBestTableForWalkIn(numberOfPeople, now.toLocalDate());
+            startTime = now.toLocalTime().isBefore(table.getOpenTime()) ? table.getOpenTime() : now.toLocalTime();
+        } else {
+            table = findTableById(tableId);
+
+            // Validar que la mesa pueda recibir walk-in ahora
+            startTime = now.toLocalTime().isBefore(table.getOpenTime()) ? table.getOpenTime() : now.toLocalTime();
+            LocalTime reservationEnd = startTime.plusMinutes(table.getReservationDurationMinutes() + table.getBufferAfterMinutes());
+
+            if (reservationEnd.isAfter(table.getCloseTime())) {
+                throw new InvalidReservationException(
+                        "No se puede hacer walk-in en este momento, la mesa cierra a las " + table.getCloseTime()
+                );
+            }
+        }
 
         ReservationRequest dto = new ReservationRequest();
         dto.setCustomerId(customerId);
-        dto.setTableId(tableId);
+        dto.setTableId(table.getId());
         dto.setNumberOfPeople(numberOfPeople);
         dto.setReservationDate(now.toLocalDate());
-        dto.setReservationTime(now.toLocalTime());
+        dto.setReservationTime(startTime);
         dto.setStatus(ReservationStatus.CONFIRMED);
 
+        // Validación de disponibilidad y horarios
         validateReservationFields(dto, table, null, true);
 
+        // Crear reserva
         Reservation reservation = Reservation.builder()
                 .customer(customer)
                 .table(table)
                 .status(ReservationStatus.CONFIRMED)
                 .build();
-
         reservation.updateFromDto(dto, customer, table);
         Reservation saved = reservationRepository.save(reservation);
 
-        // Marcar mesa como ocupada
+        // Enviar notificación opcional
+        if (sendEmail) {
+            publishReservationNotification(saved, "creada");
+        }
+
+        // Marcar mesa ocupada
         table.setStatus(TableStatus.OCCUPIED);
         tableRepository.save(table);
 
-        log.info("🚶 Walk-in manual creado: id={}, cliente={}, mesa={}, fecha={}, hora={}",
+        log.info("🚶 Walk-in creado: id={}, cliente={}, mesa={}, fecha={}, hora={}",
                 saved.getId(),
                 saved.getCustomer().getUser().getFullName(),
                 saved.getTable().getName(),
@@ -118,58 +161,51 @@ public class ReservationService {
      * Walk-in con asignación automática de mesa.
      */
     @Transactional
-    public ReservationResponse createAutoWalkInReservation(Long customerId, int numberOfPeople) {
+    public ReservationResponse createAutoWalkInReservation(Long customerId, int numberOfPeople, boolean sendEmail) {
         Customer customer = findCustomerById(customerId);
         ZonedDateTime now = ZonedDateTime.now(RESTAURANT_ZONE).truncatedTo(ChronoUnit.MINUTES);
 
-        List<TableEntity> candidateTables = tableRepository.findAll()
-                .stream()
-                .filter(t -> t.getCapacity() >= numberOfPeople && t.getStatus() == TableStatus.FREE)
-                .sorted(Comparator.comparingInt(TableEntity::getCapacity))
-                .toList();
+        // Buscar la mejor mesa disponible según capacidad y horario
+        TableEntity table = findBestTableForWalkIn(numberOfPeople, now.toLocalDate());
 
-        for (TableEntity table : candidateTables) {
-            log.debug("🔍 Probando mesa {} (capacidad {}) para {} personas", table.getName(), table.getCapacity(), numberOfPeople);
+        // Preparar DTO para validación
+        ReservationRequest dto = new ReservationRequest();
+        dto.setCustomerId(customerId);
+        dto.setTableId(table.getId());
+        dto.setNumberOfPeople(numberOfPeople);
+        dto.setReservationDate(now.toLocalDate());
+        dto.setReservationTime(now.toLocalTime());
+        dto.setStatus(ReservationStatus.CONFIRMED);
 
-            ReservationRequest dto = new ReservationRequest();
-            dto.setCustomerId(customerId);
-            dto.setTableId(table.getId());
-            dto.setNumberOfPeople(numberOfPeople);
-            dto.setReservationDate(now.toLocalDate());
-            dto.setReservationTime(now.toLocalTime());
-            dto.setStatus(ReservationStatus.CONFIRMED);
+        // Validación de reservas
+        validateReservationFields(dto, table, null, true); // true = walk-in
 
-            try {
-                validateReservationFields(dto, table, null, true);
+        // Crear reserva
+        Reservation reservation = Reservation.builder()
+                .customer(customer)
+                .table(table)
+                .status(ReservationStatus.CONFIRMED)
+                .build();
+        reservation.updateFromDto(dto, customer, table);
+        Reservation saved = reservationRepository.save(reservation);
 
-                Reservation reservation = Reservation.builder()
-                        .customer(customer)
-                        .table(table)
-                        .status(ReservationStatus.CONFIRMED)
-                        .build();
-
-                reservation.updateFromDto(dto, customer, table);
-                Reservation saved = reservationRepository.save(reservation);
-
-                // Marcar mesa ocupada
-                table.setStatus(TableStatus.OCCUPIED);
-                tableRepository.save(table);
-
-                log.info("🚀 Walk-in automático creado: id={}, cliente={}, mesa={}, fecha={}, hora={}",
-                        saved.getId(),
-                        saved.getCustomer().getUser().getFullName(),
-                        saved.getTable().getName(),
-                        saved.getReservationDate(),
-                        saved.getReservationTime());
-
-                return mapToResponse(saved);
-
-            } catch (InvalidReservationException e) {
-                log.debug("❌ Mesa {} descartada: {}", table.getName(), e.getMessage());
-            }
+        // Enviar correo opcional
+        if (sendEmail) {
+            publishReservationNotification(saved, "creada");
         }
 
-        throw new InvalidReservationException("No hay mesas disponibles para " + numberOfPeople + " personas en este momento");
+        // Marcar mesa ocupada
+        table.setStatus(TableStatus.OCCUPIED);
+        tableRepository.save(table);
+
+        log.info("🚀 Walk-in automático creado: id={}, cliente={}, mesa={}, fecha={}, hora={}",
+                saved.getId(),
+                saved.getCustomer().getUser().getFullName(),
+                saved.getTable().getName(),
+                saved.getReservationDate(),
+                saved.getReservationTime());
+
+        return mapToResponse(saved);
     }
 
     /* -------------------- READ -------------------- */
@@ -193,15 +229,22 @@ public class ReservationService {
     public ReservationResponse updateReservation(Long id, ReservationRequest dto) {
         Reservation reservation = findReservationById(id);
         Customer customer = findCustomerById(dto.getCustomerId());
-        TableEntity table = findTableById(dto.getTableId());
+        TableEntity newTable = findTableById(dto.getTableId());
 
-        validateReservationFields(dto, table, id, false);
-        reservation.updateFromDto(dto, customer, table);
+        // Validación
+        validateReservationFields(dto, newTable, id, false);
 
+        Reservation oldReservation = mapToReservationCopy(reservation); // Hacemos copia antes de actualizar
+
+        reservation.updateFromDto(dto, customer, newTable);
         Reservation updated = reservationRepository.save(reservation);
 
+        if (isSignificantChange(oldReservation, updated)) {
+            publishReservationNotification(updated, "actualizada");
+        }
+
         log.info("✏️ Reserva actualizada: id={}, cliente={}, mesa={}, fecha={}, hora={}",
-                updated.getId(), customer.getId(), table.getName(),
+                updated.getId(), customer.getId(), newTable.getName(),
                 updated.getReservationDate(), updated.getReservationTime());
 
         return mapToResponse(updated);
@@ -220,16 +263,18 @@ public class ReservationService {
         table.setStatus(TableStatus.FREE);
         tableRepository.save(table);
 
+        Customer customer = reservation.getCustomer();
+
         int points = loyaltyService.calculatePoints(
-                reservation.getCustomer(),
+                customer,
                 null,
-                "RESERVATION_COMPLETE",
+                "Reserva completada",
                 reservation.getNumberOfPeople()
         );
 
-        Customer customer = reservation.getCustomer();
-        customer.setPoints(customer.getPoints() + points);
-        customerRepository.save(customer);
+        if (points > 0) {
+            pointsHistoryService.applyPoints(customer, points, PointHistoryEventType.EARNING);
+        }
 
         log.info("🏁 Reserva completada: id={}, cliente={}, mesa={}, fecha={}, hora={}, puntos={}",
                 reservation.getId(), customer.getId(), table.getName(),
@@ -245,6 +290,7 @@ public class ReservationService {
 
         reservation.setStatus(ReservationStatus.CONFIRMED);
         reservationRepository.save(reservation);
+        publishReservationNotification(reservation, "confirmada");
 
         TableEntity table = reservation.getTable();
         table.setStatus(TableStatus.OCCUPIED);
@@ -269,6 +315,7 @@ public class ReservationService {
 
         reservation.setStatus(ReservationStatus.CANCELLED);
         reservationRepository.save(reservation);
+        publishReservationNotification(reservation, "cancelada");
 
         // Liberar mesa
         TableEntity table = reservation.getTable();
@@ -301,41 +348,36 @@ public class ReservationService {
         ZonedDateTime now = ZonedDateTime.now(RESTAURANT_ZONE);
         ZonedDateTime reservationDateTime = ZonedDateTime.of(dto.getReservationDate(), dto.getReservationTime(), RESTAURANT_ZONE);
 
-        if (isWalkIn) {
-            if (reservationDateTime.isBefore(now.minusMinutes(5))) {
-                throw new InvalidReservationException("La reserva no puede estar en el pasado (más de 5 minutos)");
-            }
-        } else {
-            ZonedDateTime minAllowed = now.plusMinutes(15);
-            if (reservationDateTime.isBefore(minAllowed)) {
-                throw new InvalidReservationException("Las reservas deben hacerse con al menos 15 minutos de anticipación");
-            }
+        // Validación de anticipación mínima
+        if (isWalkIn && reservationDateTime.isBefore(now.minusMinutes(5))) {
+            throw new InvalidReservationException("La reserva no puede estar en el pasado (más de 5 minutos)");
+        }
+        if (!isWalkIn && reservationDateTime.isBefore(now.plusMinutes(15))) {
+            throw new InvalidReservationException("Las reservas deben hacerse con al menos 15 minutos de anticipación");
         }
 
-        int bufferBefore = table.getBufferBeforeMinutes();
-        int bufferAfter = table.getBufferAfterMinutes();
+        // Horario de la mesa con buffers
+        ZonedDateTime reservationStart = reservationDateTime.minusMinutes(table.getBufferBeforeMinutes());
+        ZonedDateTime reservationEnd = reservationDateTime.plusMinutes(table.getReservationDurationMinutes() + table.getBufferAfterMinutes());
 
-        LocalTime reservationStart = dto.getReservationTime().minusMinutes(bufferBefore);
-        LocalTime reservationEnd = dto.getReservationTime()
-                .plusMinutes(table.getReservationDurationMinutes() + bufferAfter);
+        ZonedDateTime tableOpen = ZonedDateTime.of(dto.getReservationDate(), table.getOpenTime(), RESTAURANT_ZONE);
+        ZonedDateTime tableClose = ZonedDateTime.of(dto.getReservationDate(), table.getCloseTime(), RESTAURANT_ZONE);
 
-        if (reservationStart.isBefore(table.getOpenTime()) || reservationEnd.isAfter(table.getCloseTime())) {
+        if (reservationStart.isBefore(tableOpen) || reservationEnd.isAfter(tableClose)) {
             throw new InvalidReservationException("La reserva debe estar dentro del horario de la mesa: "
                     + table.getOpenTime() + " - " + table.getCloseTime());
         }
 
-        List<Reservation> reservations = reservationRepository
-                .findByTable_IdAndReservationDate(table.getId(), dto.getReservationDate());
+        // Validación de solapamiento con otras reservas
+        List<Reservation> reservations = reservationRepository.findByTable_IdAndReservationDate(table.getId(), dto.getReservationDate());
 
         for (Reservation r : reservations) {
             if (currentReservationId != null && r.getId().equals(currentReservationId)) continue;
 
-            int existingBufferBefore = r.getTable().getBufferBeforeMinutes();
-            int existingBufferAfter = r.getTable().getBufferAfterMinutes();
-
-            LocalTime existingStart = r.getReservationTime().minusMinutes(existingBufferBefore);
-            LocalTime existingEnd = r.getReservationTime()
-                    .plusMinutes(r.getTable().getReservationDurationMinutes() + existingBufferAfter);
+            ZonedDateTime existingStart = ZonedDateTime.of(r.getReservationDate(), r.getReservationTime(), RESTAURANT_ZONE)
+                    .minusMinutes(r.getTable().getBufferBeforeMinutes());
+            ZonedDateTime existingEnd = ZonedDateTime.of(r.getReservationDate(), r.getReservationTime(), RESTAURANT_ZONE)
+                    .plusMinutes(r.getTable().getReservationDurationMinutes() + r.getTable().getBufferAfterMinutes());
 
             boolean overlaps = reservationStart.isBefore(existingEnd) && reservationEnd.isAfter(existingStart);
             if (overlaps) {
@@ -365,6 +407,125 @@ public class ReservationService {
     private TableEntity findTableById(Long id) {
         return tableRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Mesa no encontrada"));
+    }
+
+    private TableEntity findBestTableForWalkIn(int numberOfPeople, LocalDate date) {
+        ZonedDateTime now = ZonedDateTime.now(RESTAURANT_ZONE).truncatedTo(ChronoUnit.MINUTES);
+
+        // Buscar la primera hora posible para walk-in
+        for (TableEntity table : tableRepository.findAll().stream()
+                .filter(t -> t.getStatus() == TableStatus.FREE)
+                .filter(t -> numberOfPeople >= t.getMinCapacity() && numberOfPeople <= t.getCapacity())
+                .toList()) {
+
+            LocalTime startTime = now.toLocalTime().isBefore(table.getOpenTime()) ? table.getOpenTime() : now.toLocalTime();
+            LocalTime reservationEnd = startTime.plusMinutes(table.getReservationDurationMinutes() + table.getBufferAfterMinutes());
+
+            if (reservationEnd.isAfter(table.getCloseTime())) {
+                // Esta mesa no puede aceptar walk-in ahora
+                continue;
+            }
+
+            ReservationRequest dto = new ReservationRequest();
+            dto.setNumberOfPeople(numberOfPeople);
+            dto.setReservationDate(date);
+            dto.setReservationTime(startTime);
+
+            try {
+                validateReservationFields(dto, table, null, true);
+                return table;
+            } catch (InvalidReservationException ignored) {
+                // Mesa no disponible
+            }
+        }
+
+        throw new InvalidReservationException("No hay mesas disponibles para walk-in en este momento");
+    }
+
+    /**
+     * Encuentra la mejor mesa libre para el número de personas y horario indicado.
+     */
+    private TableEntity findBestTableForNumberOfPeople(int numberOfPeople, LocalDate date, LocalTime time) {
+        List<TableEntity> candidateTables = tableRepository.findAll()
+                .stream()
+                .filter(t -> t.getStatus() == TableStatus.FREE)
+                .filter(t -> numberOfPeople >= t.getMinCapacity() && numberOfPeople <= t.getCapacity())
+                .sorted(Comparator.comparingInt(TableEntity::getCapacity))
+                .toList();
+
+        for (TableEntity table : candidateTables) {
+            ReservationRequest dto = new ReservationRequest();
+            dto.setNumberOfPeople(numberOfPeople);
+            dto.setReservationDate(date);
+            dto.setReservationTime(time);
+
+            try {
+                validateReservationFields(dto, table, null, false); // <--- false para reserva normal
+                return table;
+            } catch (InvalidReservationException ignored) {
+                // Mesa no disponible
+            }
+        }
+
+        throw new InvalidReservationException("No hay mesas disponibles para " + numberOfPeople + " personas en ese horario");
+    }
+
+    private void publishReservationNotification(Reservation reservation, String action) {
+        // Por defecto, enviar solo si es relevante (ya controlado en update)
+        try {
+            ReservationNotificationEvent event = ReservationNotificationEvent.builder()
+                    .userId(reservation.getCustomer().getId())
+                    .recipient(reservation.getCustomer().getUser().getEmail())
+                    .subject("Reserva " + action + " - " + reservation.getTable().getName())
+                    .message("Hola " + reservation.getCustomer().getUser().getFullName() + ",\n\n" +
+                            "Tu reserva para " + reservation.getNumberOfPeople() + " personas en la mesa " +
+                            reservation.getTable().getName() + " ha sido " + action.toLowerCase() + ".\n" +
+                            "Fecha: " + reservation.getReservationDate() + "\n" +
+                            "Hora: " + reservation.getReservationTime() + "\n\n" +
+                            "Gracias por elegirnos!")
+                    .reservationId(reservation.getId())
+                    .reservationDate(LocalDateTime.of(reservation.getReservationDate(), reservation.getReservationTime()))
+                    .reservationTime(reservation.getReservationTime().toString())
+                    .numberOfPeople(reservation.getNumberOfPeople())
+                    .customerName(reservation.getCustomer().getUser().getFullName())
+                    .tableName(reservation.getTable().getName())
+                    .actionUrl("https://miapp.com/reservations/" + reservation.getId())
+                    .build();
+
+            String payload = objectMapper.writeValueAsString(event);
+
+            KafkaMessage message = KafkaMessage.builder()
+                    .topic("notifications")
+                    .key("reservation-" + reservation.getId())
+                    .payload(payload)
+                    .build();
+
+            kafkaProducerService.sendMessage(message);
+
+        } catch (Exception e) {
+            log.error("❌ Error al publicar notificación de reserva", e);
+        }
+    }
+
+    private boolean isSignificantChange(Reservation oldRes, Reservation updatedRes) {
+        boolean statusChanged = !oldRes.getStatus().equals(updatedRes.getStatus());
+        boolean dateChanged = !oldRes.getReservationDate().equals(updatedRes.getReservationDate());
+        boolean timeChanged = !oldRes.getReservationTime().equals(updatedRes.getReservationTime());
+
+        Long oldTableId = oldRes.getTable() != null ? oldRes.getTable().getId() : null;
+        Long newTableId = updatedRes.getTable() != null ? updatedRes.getTable().getId() : null;
+        boolean tableChanged = (oldTableId == null ? newTableId != null : !oldTableId.equals(newTableId));
+
+        return statusChanged || dateChanged || timeChanged || tableChanged;
+    }
+
+    private Reservation mapToReservationCopy(Reservation res) {
+        Reservation copy = new Reservation();
+        copy.setStatus(res.getStatus());
+        copy.setReservationDate(res.getReservationDate());
+        copy.setReservationTime(res.getReservationTime());
+        copy.setTable(res.getTable());
+        return copy;
     }
 
     private ReservationResponse mapToResponse(Reservation reservation) {

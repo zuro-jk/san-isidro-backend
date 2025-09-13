@@ -23,9 +23,12 @@ public class Customer extends Auditable {
     private User user;
 
     @Column(name = "points")
-    private Integer points;
+    private Integer points = 0;
 
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Address> addresses = new LinkedHashSet<>();
+
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<PointsHistory> pointsHistories = new LinkedHashSet<>();
 
 }

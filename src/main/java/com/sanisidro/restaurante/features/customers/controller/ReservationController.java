@@ -44,19 +44,21 @@ public class ReservationController {
     @PostMapping("/walkin/manual")
     public ResponseEntity<ApiResponse<ReservationResponse>> createWalkInReservation(
             @RequestParam Long customerId,
-            @RequestParam Long tableId,
-            @RequestParam int numberOfPeople
+            @RequestParam(required = false) Long tableId,
+            @RequestParam int numberOfPeople,
+            @RequestParam(defaultValue = "true") boolean sendEmail // opcional
     ) {
-        ReservationResponse reservation = reservationService.createWalkInReservation(customerId, tableId, numberOfPeople);
+        ReservationResponse reservation = reservationService.createWalkInReservation(customerId, tableId, numberOfPeople, sendEmail);
         return new ResponseEntity<>(new ApiResponse<>(true, "Walk-in creado correctamente (manual)", reservation), HttpStatus.CREATED);
     }
 
     @PostMapping("/walkin/auto")
     public ResponseEntity<ApiResponse<ReservationResponse>> createAutoWalkInReservation(
             @RequestParam Long customerId,
-            @RequestParam int numberOfPeople
+            @RequestParam int numberOfPeople,
+            @RequestParam(defaultValue = "true") boolean sendEmail // opcional, default true
     ) {
-        ReservationResponse reservation = reservationService.createAutoWalkInReservation(customerId, numberOfPeople);
+        ReservationResponse reservation = reservationService.createAutoWalkInReservation(customerId, numberOfPeople, sendEmail);
         return new ResponseEntity<>(new ApiResponse<>(true, "Walk-in creado correctamente (automático)", reservation), HttpStatus.CREATED);
     }
 
