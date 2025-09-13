@@ -59,6 +59,11 @@ public class TableService {
                 .name(table.getName())
                 .capacity(table.getCapacity())
                 .description(table.getDescription())
+                .openTime(table.getOpenTime())
+                .closeTime(table.getCloseTime())
+                .reservationDurationMinutes(table.getReservationDurationMinutes())
+                .bufferBeforeMinutes(table.getBufferBeforeMinutes())
+                .bufferAfterMinutes(table.getBufferAfterMinutes())
                 .build();
     }
 

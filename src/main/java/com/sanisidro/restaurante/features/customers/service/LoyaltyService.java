@@ -12,8 +12,6 @@ import org.springframework.stereotype.Service;
 public class LoyaltyService {
 
     private final LoyaltyRuleRepository loyaltyRuleRepository;
-    private final CustomerRepository customerRepository;
-    private final PointsHistoryRepository pointsHistoryRepository;
 
     /**
      * Calcula cuántos puntos deberían aplicarse según el evento.

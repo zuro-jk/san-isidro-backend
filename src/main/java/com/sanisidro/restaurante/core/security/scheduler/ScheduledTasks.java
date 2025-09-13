@@ -1,8 +1,6 @@
 package com.sanisidro.restaurante.core.security.scheduler;
 
-import com.sanisidro.restaurante.core.security.repository.TokenAuditRepository;
 import com.sanisidro.restaurante.core.security.service.TokenAuditCleanupService;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;

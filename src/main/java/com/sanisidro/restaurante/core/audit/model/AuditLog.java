@@ -22,10 +22,10 @@ public class AuditLog {
     private Long entityId;
     private String action;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String oldValue;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String newValue;
 
     private Long userId;

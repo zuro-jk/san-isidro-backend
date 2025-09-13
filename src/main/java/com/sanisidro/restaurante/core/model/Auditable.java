@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.sanisidro.restaurante.features.customers.model.Customer;
 import jakarta.persistence.*;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
@@ -47,9 +48,7 @@ public class Auditable {
 
     @PostLoad
     public void captureOldSnapshot() {
-        if (this.oldSnapshot == null) {
-            this.oldSnapshot = new HashMap<>();
-        }
+        this.oldSnapshot = AuditableEntityListener.snapshotEntity(this);
     }
 
 }

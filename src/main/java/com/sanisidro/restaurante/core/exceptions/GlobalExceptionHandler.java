@@ -59,13 +59,8 @@ public class GlobalExceptionHandler {
         return buildResponse(ex.getMessage(), HttpStatus.NOT_FOUND);
     }
 
-    @ExceptionHandler({
-            UsernameAlreadyExistsException.class,
-            EmailAlreadyExistsException.class,
-            DuplicateReservationException.class,
-            CustomerAlreadyExistsException.class
-    })
-    public ResponseEntity<ApiResponse<Object>> handleConflict(RuntimeException ex) {
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiResponse<Object>> handleConflict(ConflictException ex) {
         return buildResponse(ex.getMessage(), HttpStatus.CONFLICT);
     }
 

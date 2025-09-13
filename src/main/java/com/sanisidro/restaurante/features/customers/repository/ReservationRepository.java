@@ -8,22 +8,16 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 
 @Repository
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
 
     Page<Reservation> findByCustomerId(Long customerId, Pageable pageable);
-    List<Reservation> findByCustomerId(Long customerId);
-    List<Reservation> findByStatus(ReservationStatus status);
-    List<Reservation> findByReservationDate(LocalDate date);
+    List<Reservation> findByTable_IdAndReservationDate(Long tableId, LocalDate date);
 
-    boolean existsByCustomer_IdAndReservationDateAndReservationTime(
-            Long customerId, LocalDate reservationDate, LocalTime reservationTime
-    );
-
-    boolean existsByTable_IdAndReservationDateAndReservationTime(
-            Long tableId, LocalDate reservationDate, LocalTime reservationTime
+    List<Reservation> findByStatusAndReservationDateOrderByReservationTimeAsc(
+            ReservationStatus status,
+            LocalDate reservationDate
     );
 }

@@ -13,9 +13,8 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class AuditLogService {
 
-
     private final AuditLogRepository auditLogRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     public void log(String entityName, Long entityId, String action,
                     Object oldValue, Object newValue, Long userId, String username) {
@@ -36,5 +35,4 @@ public class AuditLogService {
             throw new RuntimeException("Error serializing audit log", e);
         }
     }
-
 }
