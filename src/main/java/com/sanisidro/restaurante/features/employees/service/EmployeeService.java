@@ -67,16 +67,6 @@ public class EmployeeService {
 
         Employee saved = employeeRepository.save(employee);
 
-//        auditLogService.log(
-//                "Employee",
-//                saved.getId(),
-//                "CREATE",
-//                null,
-//                saved,
-//                user.getUsername()
-//        );
-
-
         return mapToResponse(saved);
     }
 
@@ -100,15 +90,6 @@ public class EmployeeService {
 
         Employee updated = employeeRepository.save(employee);
 
-//        auditLogService.log(
-//                "Employee",
-//                updated.getId(),
-//                "UPDATE",
-//                oldState,
-//                updated,
-//                user.getUsername()
-//        );
-
         return mapToResponse(updated);
     }
 
@@ -117,14 +98,6 @@ public class EmployeeService {
                 .orElseThrow(() -> new EntityNotFoundException("Empleado no encontrado con id: " + id));
 
         employeeRepository.delete(employee);
-//        auditLogService.log(
-//                "Employee",
-//                employee.getId(),
-//                "DELETE",
-//                employee,
-//                null,
-//                employee.getUser().getUsername()
-//        );
     }
 
     private EmployeeResponse mapToResponse(Employee employee) {

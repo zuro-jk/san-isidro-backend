@@ -14,6 +14,7 @@ import com.sanisidro.restaurante.features.orders.repository.OrderRepository;
 import com.sanisidro.restaurante.features.products.model.Product;
 import com.sanisidro.restaurante.features.products.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ReviewService {
 
     private final ReviewRepository reviewRepository;
@@ -45,7 +47,6 @@ public class ReviewService {
     }
 
     public ReviewResponse createReview(ReviewRequest dto) {
-
         Customer customer = customerRepository.findById(dto.getCustomerId())
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado"));
 
@@ -60,7 +61,6 @@ public class ReviewService {
         if (dto.getOrderId() != null) count++;
         if (dto.getReservationId() != null) count++;
         if (dto.getProductId() != null) count++;
-
         if (count != 1) {
             throw new IllegalArgumentException("Debe especificar exactamente uno: orderId, reservationId o productId");
         }
@@ -68,34 +68,25 @@ public class ReviewService {
         if (dto.getOrderId() != null) {
             Order order = orderRepository.findById(dto.getOrderId())
                     .orElseThrow(() -> new ResourceNotFoundException("Orden no encontrada"));
-
-            if (reviewRepository.existsByCustomer_IdAndOrder_Id(customer.getId(), order.getId())) {
-                throw new IllegalArgumentException("El cliente ya realizó una reseña para esta orden");
-            }
             review.setOrder(order);
         }
 
         if (dto.getReservationId() != null) {
             Reservation reservation = reservationRepository.findById(dto.getReservationId())
                     .orElseThrow(() -> new ResourceNotFoundException("Reserva no encontrada"));
-
-            if (reviewRepository.existsByCustomer_IdAndReservation_Id(customer.getId(), reservation.getId())) {
-                throw new IllegalArgumentException("El cliente ya realizó una reseña para esta reserva");
-            }
             review.setReservation(reservation);
         }
 
         if (dto.getProductId() != null) {
             Product product = productRepository.findById(dto.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
-
-            if (reviewRepository.existsByCustomer_IdAndProduct_Id(customer.getId(), product.getId())) {
-                throw new IllegalArgumentException("El cliente ya realizó una reseña para este producto");
-            }
             review.setProduct(product);
         }
 
-        return mapToResponse(reviewRepository.save(review));
+        Review saved = reviewRepository.save(review);
+        log.info("Review creada: id={}, customerId={}, recurso={}", saved.getId(), customer.getId(),
+                getResourceType(saved));
+        return mapToResponse(saved);
     }
 
     public ReviewResponse updateReview(Long id, ReviewRequest dto) {
@@ -105,13 +96,9 @@ public class ReviewService {
         if (dto.getComment() != null) review.setComment(dto.getComment());
         if (dto.getRating() != null) review.setRating(dto.getRating());
 
-        // Solo permitir cambiar el recurso si no hay otra review para ese recurso
         if (dto.getOrderId() != null) {
             Order order = orderRepository.findById(dto.getOrderId())
                     .orElseThrow(() -> new ResourceNotFoundException("Orden no encontrada"));
-            if (reviewRepository.existsByCustomer_IdAndOrder_IdAndIdNot(review.getCustomer().getId(), order.getId(), id)) {
-                throw new IllegalArgumentException("El cliente ya realizó una reseña para esta orden");
-            }
             review.setOrder(order);
             review.setReservation(null);
             review.setProduct(null);
@@ -120,9 +107,6 @@ public class ReviewService {
         if (dto.getReservationId() != null) {
             Reservation reservation = reservationRepository.findById(dto.getReservationId())
                     .orElseThrow(() -> new ResourceNotFoundException("Reserva no encontrada"));
-            if (reviewRepository.existsByCustomer_IdAndReservation_IdAndIdNot(review.getCustomer().getId(), reservation.getId(), id)) {
-                throw new IllegalArgumentException("El cliente ya realizó una reseña para esta reserva");
-            }
             review.setReservation(reservation);
             review.setOrder(null);
             review.setProduct(null);
@@ -131,15 +115,15 @@ public class ReviewService {
         if (dto.getProductId() != null) {
             Product product = productRepository.findById(dto.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
-            if (reviewRepository.existsByCustomer_IdAndProduct_IdAndIdNot(review.getCustomer().getId(), product.getId(), id)) {
-                throw new IllegalArgumentException("El cliente ya realizó una reseña para este producto");
-            }
             review.setProduct(product);
             review.setOrder(null);
             review.setReservation(null);
         }
 
-        return mapToResponse(reviewRepository.save(review));
+        Review updated = reviewRepository.save(review);
+        log.info("Review actualizada: id={}, customerId={}, recurso={}", updated.getId(),
+                updated.getCustomer().getId(), getResourceType(updated));
+        return mapToResponse(updated);
     }
 
     public void deleteReview(Long id) {
@@ -147,6 +131,7 @@ public class ReviewService {
             throw new ResourceNotFoundException("Reseña no encontrada");
         }
         reviewRepository.deleteById(id);
+        log.info("Review eliminada: id={}", id);
     }
 
     private ReviewResponse mapToResponse(Review review) {
@@ -161,5 +146,12 @@ public class ReviewService {
                 .rating(review.getRating())
                 .date(review.getDate())
                 .build();
+    }
+
+    private String getResourceType(Review review) {
+        if (review.getOrder() != null) return "Order";
+        if (review.getReservation() != null) return "Reservation";
+        if (review.getProduct() != null) return "Product";
+        return "Unknown";
     }
 }

@@ -15,37 +15,54 @@ public class OneReviewPerResourceValidator implements ConstraintValidator<OneRev
 
     @Override
     public boolean isValid(ReviewRequest dto, ConstraintValidatorContext context) {
-
         if (dto.getCustomerId() == null) {
-            return true; // No hay cliente, otra validación debe manejarlo
+            return true;
         }
 
-        // Validar review por orden
+        int count = 0;
+        if (dto.getOrderId() != null) count++;
+        if (dto.getReservationId() != null) count++;
+        if (dto.getProductId() != null) count++;
+        if (count != 1) {
+            context.disableDefaultConstraintViolation();
+            context.buildConstraintViolationWithTemplate(
+                    "Debe especificar exactamente uno: orderId, reservationId o productId"
+            ).addConstraintViolation();
+            return false;
+        }
+
         if (dto.getOrderId() != null) {
             if (dto.getId() != null) {
                 // Update
-                return !reviewRepository.existsByCustomer_IdAndOrder_IdAndIdNot(dto.getCustomerId(), dto.getOrderId(), dto.getId());
+                return !reviewRepository.existsByCustomer_IdAndOrder_IdAndIdNot(
+                        dto.getCustomerId(), dto.getOrderId(), dto.getId()
+                );
             }
             return !reviewRepository.existsByCustomer_IdAndOrder_Id(dto.getCustomerId(), dto.getOrderId());
         }
 
-        // Validar review por reserva
         if (dto.getReservationId() != null) {
             if (dto.getId() != null) {
-                return !reviewRepository.existsByCustomer_IdAndReservation_IdAndIdNot(dto.getCustomerId(), dto.getReservationId(), dto.getId());
+                return !reviewRepository.existsByCustomer_IdAndReservation_IdAndIdNot(
+                        dto.getCustomerId(), dto.getReservationId(), dto.getId()
+                );
             }
-            return !reviewRepository.existsByCustomer_IdAndReservation_Id(dto.getCustomerId(), dto.getReservationId());
+            return !reviewRepository.existsByCustomer_IdAndReservation_Id(
+                    dto.getCustomerId(), dto.getReservationId()
+            );
         }
 
-        // Validar review por producto
         if (dto.getProductId() != null) {
             if (dto.getId() != null) {
-                return !reviewRepository.existsByCustomer_IdAndProduct_IdAndIdNot(dto.getCustomerId(), dto.getProductId(), dto.getId());
+                return !reviewRepository.existsByCustomer_IdAndProduct_IdAndIdNot(
+                        dto.getCustomerId(), dto.getProductId(), dto.getId()
+                );
             }
-            return !reviewRepository.existsByCustomer_IdAndProduct_Id(dto.getCustomerId(), dto.getProductId());
+            return !reviewRepository.existsByCustomer_IdAndProduct_Id(
+                    dto.getCustomerId(), dto.getProductId()
+            );
         }
 
-        // Si no hay recurso definido, dejamos pasar
         return true;
     }
 }

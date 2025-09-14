@@ -20,12 +20,12 @@ public class LoyaltyRule {
     private Long id;
 
     @Column(nullable = false, length = 100, unique = true)
-    private String name; // Nombre descriptivo de la regla
+    private String name;
 
     @Column(nullable = false)
-    private Integer points; // Puntos otorgados
+    private Integer points;
 
-    private Double minPurchaseAmount; // Opcional, solo para PURCHASE
+    private Double minPurchaseAmount;
 
     @Column(nullable = false)
     private Boolean active = true;
@@ -35,5 +35,5 @@ public class LoyaltyRule {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private LoyaltyRuleType type; // Tipo de regla
+    private LoyaltyRuleType type;
 }

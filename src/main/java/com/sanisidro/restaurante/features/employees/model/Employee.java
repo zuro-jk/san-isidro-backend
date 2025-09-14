@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@AttributeOverride(name = "id", column = @Column(name = "employee_id"))
 public class Employee extends Auditable {
 
     @OneToOne(optional = false)
@@ -25,5 +26,4 @@ public class Employee extends Auditable {
 
 
     private BigDecimal salary;
-
 }

@@ -2,6 +2,8 @@ package com.sanisidro.restaurante.features.products.dto.inventory.response;
 
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -13,4 +15,6 @@ public class InventoryResponse {
     private String productName;
     private Integer currentStock;
     private Integer minimumStock;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

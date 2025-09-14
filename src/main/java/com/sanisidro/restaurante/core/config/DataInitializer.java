@@ -7,15 +7,27 @@ import com.sanisidro.restaurante.core.security.repository.UserRepository;
 import com.sanisidro.restaurante.features.customers.enums.LoyaltyRuleType;
 import com.sanisidro.restaurante.features.customers.model.LoyaltyRule;
 import com.sanisidro.restaurante.features.customers.repository.LoyaltyRuleRepository;
+import com.sanisidro.restaurante.features.orders.model.OrderStatus;
+import com.sanisidro.restaurante.features.orders.model.OrderStatusTranslation;
+import com.sanisidro.restaurante.features.orders.model.OrderType;
+import com.sanisidro.restaurante.features.orders.model.OrderTypeTranslation;
+import com.sanisidro.restaurante.features.orders.repository.OrderStatusRepository;
+import com.sanisidro.restaurante.features.orders.repository.OrderTypeRepository;
+import com.sanisidro.restaurante.features.products.model.Category;
+import com.sanisidro.restaurante.features.products.model.Product;
+import com.sanisidro.restaurante.features.products.repository.CategoryRepository;
+import com.sanisidro.restaurante.features.products.repository.ProductRepository;
 import com.sanisidro.restaurante.features.restaurant.enums.TableStatus;
 import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
 import com.sanisidro.restaurante.features.restaurant.repository.TableRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.util.Collections;
 import java.util.List;
@@ -23,13 +35,19 @@ import java.util.List;
 @Component
 @Profile("dev")
 @RequiredArgsConstructor
+@Slf4j
 public class DataInitializer implements CommandLineRunner {
+
 
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private final LoyaltyRuleRepository loyaltyRuleRepository;
     private final PasswordEncoder passwordEncoder;
     private final TableRepository tableRepository;
+    private final OrderStatusRepository orderStatusRepository;
+    private final OrderTypeRepository orderTypeRepository;
+    private final CategoryRepository categoryRepository;
+    private final ProductRepository productRepository;
 
     @Override
     public void run(String... args) throws Exception {
@@ -37,6 +55,9 @@ public class DataInitializer implements CommandLineRunner {
         initAdminUser();
         initLoyaltyRules();
         initTables();
+        initOrderStatuses();
+        initOrderTypes();
+        initCategoriesAndProducts();
     }
 
     private void initRoles() {
@@ -400,4 +421,159 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
 
+    private void initOrderStatuses() {
+        if (orderStatusRepository.count() > 0) {
+            log.info(">>> Order statuses ya inicializados");
+            return;
+        }
+
+        log.info(">>> Inicializando Order Statuses...");
+
+        OrderStatus pending = OrderStatus.builder().code("PENDING").build();
+        pending.getTranslations().addAll(List.of(
+                OrderStatusTranslation.builder().orderStatus(pending).lang("en").name("Pending").description("Order has been placed but not processed yet").build(),
+                OrderStatusTranslation.builder().orderStatus(pending).lang("es").name("Pendiente").description("El pedido ha sido realizado pero no procesado").build()
+        ));
+
+        OrderStatus inProgress = OrderStatus.builder().code("IN_PROGRESS").build();
+        inProgress.getTranslations().addAll(List.of(
+                OrderStatusTranslation.builder().orderStatus(inProgress).lang("en").name("In Progress").description("Order is being prepared").build(),
+                OrderStatusTranslation.builder().orderStatus(inProgress).lang("es").name("En Proceso").description("El pedido está siendo preparado").build()
+        ));
+
+        OrderStatus readyForPickup = OrderStatus.builder().code("READY_FOR_PICKUP").build();
+        readyForPickup.getTranslations().addAll(List.of(
+                OrderStatusTranslation.builder().orderStatus(readyForPickup).lang("en").name("Ready for Pickup").description("Order is ready to be picked up").build(),
+                OrderStatusTranslation.builder().orderStatus(readyForPickup).lang("es").name("Listo para recoger").description("El pedido está listo para ser recogido").build()
+        ));
+
+        OrderStatus completed = OrderStatus.builder().code("COMPLETED").build();
+        completed.getTranslations().addAll(List.of(
+                OrderStatusTranslation.builder().orderStatus(completed).lang("en").name("Completed").description("Order has been completed").build(),
+                OrderStatusTranslation.builder().orderStatus(completed).lang("es").name("Completado").description("El pedido ha sido completado").build()
+        ));
+
+        OrderStatus cancelled = OrderStatus.builder().code("CANCELLED").build();
+        cancelled.getTranslations().addAll(List.of(
+                OrderStatusTranslation.builder().orderStatus(cancelled).lang("en").name("Cancelled").description("Order has been cancelled").build(),
+                OrderStatusTranslation.builder().orderStatus(cancelled).lang("es").name("Cancelado").description("El pedido ha sido cancelado").build()
+        ));
+
+        OrderStatus failed = OrderStatus.builder().code("FAILED").build();
+        failed.getTranslations().addAll(List.of(
+                OrderStatusTranslation.builder().orderStatus(failed).lang("en").name("Failed").description("Order could not be processed").build(),
+                OrderStatusTranslation.builder().orderStatus(failed).lang("es").name("Fallido").description("El pedido no pudo ser procesado").build()
+        ));
+
+        List<OrderStatus> statuses = List.of(pending, inProgress, readyForPickup, completed, cancelled, failed);
+        orderStatusRepository.saveAll(statuses);
+
+        statuses.forEach(s -> log.info(">>> OrderStatus '{}' inicializado con traducciones", s.getCode()));
+    }
+
+    private void initOrderTypes() {
+        if (orderTypeRepository.count() > 0) {
+            log.info(">>> Order types ya inicializados");
+            return;
+        }
+
+        log.info(">>> Inicializando Order Types...");
+
+        OrderType dineIn = OrderType.builder().code("DINE_IN").build();
+        dineIn.getTranslations().addAll(List.of(
+                OrderTypeTranslation.builder().orderType(dineIn).lang("en").name("Dine-in").description("Order for consumption inside the restaurant").build(),
+                OrderTypeTranslation.builder().orderType(dineIn).lang("es").name("Presencial").description("Pedido para consumo dentro del restaurante").build()
+        ));
+
+        OrderType takeAway = OrderType.builder().code("TAKE_AWAY").build();
+        takeAway.getTranslations().addAll(List.of(
+                OrderTypeTranslation.builder().orderType(takeAway).lang("en").name("Take Away").description("Order to be picked up and taken away").build(),
+                OrderTypeTranslation.builder().orderType(takeAway).lang("es").name("Para llevar").description("Pedido para recoger y llevar").build()
+        ));
+
+        OrderType delivery = OrderType.builder().code("DELIVERY").build();
+        delivery.getTranslations().addAll(List.of(
+                OrderTypeTranslation.builder().orderType(delivery).lang("en").name("Delivery").description("Order to be delivered to customer's address").build(),
+                OrderTypeTranslation.builder().orderType(delivery).lang("es").name("Entrega a domicilio").description("Pedido a ser entregado en la dirección del cliente").build()
+        ));
+
+        List<OrderType> types = List.of(dineIn, takeAway, delivery);
+        orderTypeRepository.saveAll(types);
+
+        types.forEach(t -> log.info(">>> OrderType '{}' inicializado con traducciones", t.getCode()));
+    }
+
+    private void initCategoriesAndProducts() {
+        if (categoryRepository.count() > 0) {
+            log.info(">>> Categorías y productos ya inicializados");
+            return;
+        }
+
+        log.info(">>> Inicializando categorías y productos...");
+
+        // Crear categorías
+        Category beverages = Category.builder().name("Bebidas").build();
+        Category appetizers = Category.builder().name("Entradas").build();
+        Category mainDishes = Category.builder().name("Platos principales").build();
+        Category desserts = Category.builder().name("Postres").build();
+
+        List<Category> categories = List.of(beverages, appetizers, mainDishes, desserts);
+        categoryRepository.saveAll(categories);
+        log.info(">>> Categorías inicializadas: Bebidas, Entradas, Platos principales, Postres");
+
+        // Crear productos
+        List<Product> products = List.of(
+                Product.builder()
+                        .name("Coca-Cola 500ml")
+                        .price(new BigDecimal("3.50"))
+                        .imageUrl("https://lacanga.com/cdn/shop/files/SLFk8fwFmHSQ7qcTv-sintitulo2556.png?v=1685580356")
+                        .category(beverages)
+                        .build(),
+                Product.builder()
+                        .name("Jugo de Naranja Natural")
+                        .price(new BigDecimal("5.00"))
+                        .imageUrl("https://image.tuasaude.com/media/article/go/jh/suco-de-laranja_67324.jpg")
+                        .category(beverages)
+                        .build(),
+                Product.builder()
+                        .name("Nachos con Queso")
+                        .price(new BigDecimal("12.00"))
+                        .imageUrl("https://www.divinacocina.es/wp-content/uploads/nachos-con-salsa-queso.jpg")
+                        .category(appetizers)
+                        .build(),
+                Product.builder()
+                        .name("Alitas BBQ")
+                        .price(new BigDecimal("15.00"))
+                        .imageUrl("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTR0GgvGRXZ9rGXssme3fuDO5SlUbf7tB8sOw&s")
+                        .category(appetizers)
+                        .build(),
+                Product.builder()
+                        .name("Hamburguesa Clásica")
+                        .price(new BigDecimal("18.00"))
+                        .imageUrl("https://tofuu.getjusto.com/orioneat-local/resized2/4Zg3b29e8fYXFT9ww-2400-x.webp")
+                        .category(mainDishes)
+                        .build(),
+                Product.builder()
+                        .name("Lomo Saltado")
+                        .price(new BigDecimal("22.00"))
+                        .imageUrl("https://origin.cronosmedia.glr.pe/large/2024/05/15/lg_664520c66ade8d4879400887.jpg")
+                        .category(mainDishes)
+                        .build(),
+                Product.builder()
+                        .name("Cheesecake")
+                        .price(new BigDecimal("10.00"))
+                        .imageUrl("https://www.recetasnestle.com.ec/sites/default/files/styles/recipe_detail_desktop_new/public/srh_recipes/7f9ebeaceea909a80306da27f0495c59.jpg?itok=_Xp6MoSe")
+                        .category(desserts)
+                        .build(),
+                Product.builder()
+                        .name("Brownie con Helado")
+                        .price(new BigDecimal("12.00"))
+                        .imageUrl("https://www.johaprato.com/files/brownie_y_helado.jpg")
+                        .category(desserts)
+                        .build()
+        );
+
+        productRepository.saveAll(products);
+        log.info(">>> Productos inicializados correctamente");
+    }
 }

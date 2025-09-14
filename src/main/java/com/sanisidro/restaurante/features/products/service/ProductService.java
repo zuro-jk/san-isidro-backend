@@ -1,7 +1,10 @@
 package com.sanisidro.restaurante.features.products.service;
 
+import com.sanisidro.restaurante.core.security.dto.ApiResponse;
 import com.sanisidro.restaurante.features.products.dto.product.request.ProductRequest;
 import com.sanisidro.restaurante.features.products.dto.product.response.ProductResponse;
+import com.sanisidro.restaurante.features.products.exceptions.CategoryNotFoundException;
+import com.sanisidro.restaurante.features.products.exceptions.ProductNotFoundException;
 import com.sanisidro.restaurante.features.products.model.Category;
 import com.sanisidro.restaurante.features.products.model.Product;
 import com.sanisidro.restaurante.features.products.repository.CategoryRepository;
@@ -10,6 +13,7 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -20,26 +24,31 @@ public class ProductService {
     private final CategoryRepository categoryRepository;
 
     public List<ProductResponse> getAll() {
-        return productRepository.findAll().stream()
+        List<ProductResponse> products = productRepository.findAll().stream()
                 .map(this::mapToResponse)
                 .toList();
+        return products;
     }
 
     public List<ProductResponse> getByCategory(Long categoryId) {
-        return productRepository.findByCategoryId(categoryId).stream()
+        categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new CategoryNotFoundException("Categoría no encontrada con id: " + categoryId));
+
+        List<ProductResponse> products = productRepository.findByCategoryId(categoryId).stream()
                 .map(this::mapToResponse)
                 .toList();
+        return products;
     }
 
     public ProductResponse getById(Long id) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Producto no encontrado con id: " + id));
+                .orElseThrow(() -> new ProductNotFoundException("Producto no encontrado con id: " + id));
         return mapToResponse(product);
     }
 
     public ProductResponse create(ProductRequest request) {
         Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new EntityNotFoundException("Categoría no encontrada con id: " + request.getCategoryId()));
+                .orElseThrow(() -> new CategoryNotFoundException("Categoría no encontrada con id: " + request.getCategoryId()));
 
         Product product = Product.builder()
                 .name(request.getName())
@@ -48,29 +57,39 @@ public class ProductService {
                 .imageUrl(request.getImageUrl())
                 .build();
 
-        return mapToResponse(productRepository.save(product));
+        Product savedProduct = productRepository.save(product);
+        return mapToResponse(savedProduct);
     }
 
     public ProductResponse update(Long id, ProductRequest request) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Producto no encontrado con id: " + id));
+                .orElseThrow(() -> new ProductNotFoundException("Producto no encontrado con id: " + id));
 
-        Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new EntityNotFoundException("Categoría no encontrada con id: " + request.getCategoryId()));
+        if (request.getName() != null && !request.getName().isBlank()) {
+            product.setName(request.getName());
+        }
+        if (request.getPrice() != null && request.getPrice().compareTo(BigDecimal.ZERO) >= 0) {
+            product.setPrice(request.getPrice());
+        }
+        if (request.getCategoryId() != null) {
+            Category category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new CategoryNotFoundException("Categoría no encontrada con id: " + request.getCategoryId()));
+            product.setCategory(category);
+        }
+        if (request.getImageUrl() != null) {
+            product.setImageUrl(request.getImageUrl());
+        }
 
-        product.setName(request.getName());
-        product.setPrice(request.getPrice());
-        product.setCategory(category);
-        product.setImageUrl(request.getImageUrl());
-
-        return mapToResponse(productRepository.save(product));
+        Product updatedProduct = productRepository.save(product);
+        return mapToResponse(updatedProduct);
     }
 
-    public void delete(Long id) {
+    public Void delete(Long id) {
         if (!productRepository.existsById(id)) {
-            throw new EntityNotFoundException("Producto no encontrado con id: " + id);
+            throw new ProductNotFoundException("Producto no encontrado con id: " + id);
         }
         productRepository.deleteById(id);
+        return null;
     }
 
     private ProductResponse mapToResponse(Product product) {

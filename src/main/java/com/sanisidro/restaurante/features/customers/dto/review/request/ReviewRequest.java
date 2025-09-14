@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.features.customers.dto.review.request;
 
+import com.sanisidro.restaurante.features.customers.validation.review.OneReviewPerResource;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
@@ -7,6 +8,7 @@ import lombok.*;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
+@OneReviewPerResource
 public class ReviewRequest {
     private Long id;
 
