@@ -30,7 +30,7 @@ public class IngredientService {
 
     public IngredientResponse findById(Long id) {
         Ingredient ingredient = ingredientRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Ingredient not found"));
+                .orElseThrow(() -> new IngredientNotFoundException("Ingrediente no encontrado con id: " + id));
         return toResponse(ingredient);
     }
 
@@ -41,8 +41,6 @@ public class IngredientService {
         Ingredient ingredient = Ingredient.builder()
                 .name(request.getName())
                 .unit(unit)
-                .stock(request.getStock())
-                .minStock(request.getMinStock())
                 .build();
 
         return toResponse(ingredientRepository.save(ingredient));
@@ -53,8 +51,6 @@ public class IngredientService {
                 .orElseThrow(() -> new IngredientNotFoundException("Ingrediente no encontrado con id: " + id));
 
         ingredient.setName(request.getName());
-        ingredient.setStock(request.getStock());
-        ingredient.setMinStock(request.getMinStock());
 
         if (request.getUnitId() != null) {
             Unit unit = unitRepository.findById(request.getUnitId())
@@ -76,11 +72,9 @@ public class IngredientService {
         return IngredientResponse.builder()
                 .id(ingredient.getId())
                 .name(ingredient.getName())
-                .unitId(ingredient.getUnit().getId())   // 👈 devolvemos id
-                .unitName(ingredient.getUnit().getName()) // 👈 y nombre de la unidad
-                .unitSymbol(ingredient.getUnit().getSymbol()) // 👈 y símbolo
-                .stock(ingredient.getStock())
-                .minStock(ingredient.getMinStock())
+                .unitId(ingredient.getUnit().getId())
+                .unitName(ingredient.getUnit().getName())
+                .unitSymbol(ingredient.getUnit().getSymbol())
                 .build();
     }
 

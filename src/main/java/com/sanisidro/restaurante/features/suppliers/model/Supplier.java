@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.features.suppliers.model;
 
+import com.sanisidro.restaurante.core.security.model.User;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -17,12 +18,19 @@ public class Supplier {
     @Column(name = "supplier_id")
     private Long id;
 
-    @Column(name = "name", nullable = false)
-    private String name;
+    @Column(name = "company_name", nullable = false)
+    private String companyName;
 
-    @Column(name = "contact")
-    private String contact;
+    @Column(name = "contact_name", nullable = false)
+    private String contactName;
+
+    @Column(name = "phone")
+    private String phone;
 
     @Column(name = "address", columnDefinition = "text")
     private String address;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", referencedColumnName = "user_id")
+    private User user;
 }

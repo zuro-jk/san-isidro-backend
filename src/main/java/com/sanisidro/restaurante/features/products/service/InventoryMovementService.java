@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -84,7 +85,7 @@ public class InventoryMovementService {
     }
 
     private void validateRequest(InventoryMovementRequest request) {
-        if (request.getQuantity() == null || request.getQuantity() <= 0) {
+        if (request.getQuantity() == null || request.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidQuantityException("La cantidad debe ser mayor a cero para ingredienteId: " + request.getIngredientId());
         }
         if (request.getType() == null) {
@@ -96,7 +97,7 @@ public class InventoryMovementService {
     }
 
     private void applyStockChange(Inventory inventory, InventoryMovementRequest request) {
-        int qty = request.getQuantity();
+        BigDecimal qty = request.getQuantity();
         MovementType type = request.getType();
 
         switch (type) {
@@ -111,6 +112,8 @@ public class InventoryMovementService {
                 .id(movement.getId())
                 .ingredientId(movement.getIngredient().getId())
                 .ingredientName(movement.getIngredient().getName())
+                .unitName(movement.getIngredient().getUnit().getName())
+                .unitSymbol(movement.getIngredient().getUnit().getSymbol())
                 .type(movement.getType())
                 .quantity(movement.getQuantity())
                 .date(movement.getDate())

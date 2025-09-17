@@ -1,5 +1,7 @@
 package com.sanisidro.restaurante.features.products.model;
 
+import com.sanisidro.restaurante.features.products.exceptions.InsufficientStockException;
+import com.sanisidro.restaurante.features.products.exceptions.InvalidQuantityException;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -23,17 +25,20 @@ public class Inventory {
     @JoinColumn(name = "ingredient_id", nullable = false, unique = true)
     private Ingredient ingredient;
 
-    @Column(name = "current_stock", nullable = false)
-    private Integer currentStock;
+    @Column(name = "current_stock", nullable = false, precision = 12, scale = 2)
+    private BigDecimal currentStock;
 
-    @Column(name = "minimum_stock", nullable = false)
-    private Integer minimumStock;
+    @Column(name = "minimum_stock", nullable = false, precision = 12, scale = 2)
+    private BigDecimal minimumStock;
 
     @Column(updatable = false, nullable = false)
     private LocalDateTime createdAt;
 
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+    @Version
+    private Long version;
 
     @PrePersist
     protected void onCreate() {
@@ -46,14 +51,20 @@ public class Inventory {
         updatedAt = LocalDateTime.now();
     }
 
-    public void increaseStock(int qty) {
-        if (qty < 0) throw new IllegalArgumentException("Cantidad debe ser positiva");
-        this.currentStock += qty;
+    public void increaseStock(BigDecimal qty) {
+        if (qty.compareTo(BigDecimal.ZERO) < 0) throw new InvalidQuantityException("Cantidad debe ser positiva");
+        this.currentStock = this.currentStock.add(qty);
     }
 
-    public void decreaseStock(int qty) {
-        if (qty < 0) throw new IllegalArgumentException("Cantidad debe ser positiva");
-        if (this.currentStock < qty) throw new IllegalStateException("Stock insuficiente");
-        this.currentStock -= qty;
+    public void decreaseStock(BigDecimal qty) {
+        if (qty.compareTo(BigDecimal.ZERO) < 0)
+            throw new InvalidQuantityException("Cantidad debe ser positiva");
+
+        if (this.currentStock.compareTo(qty) < 0)
+            throw new InsufficientStockException(
+                    "Stock insuficiente. Disponible: " + this.currentStock + ", solicitado: " + qty
+            );
+
+        this.currentStock = this.currentStock.subtract(qty);
     }
 }

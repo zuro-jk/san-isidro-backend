@@ -5,7 +5,10 @@ import com.sanisidro.restaurante.core.aws.exception.FileNotFoundException;
 import com.sanisidro.restaurante.core.aws.exception.FileUploadException;
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
 import com.sanisidro.restaurante.features.products.exceptions.*;
+import com.sanisidro.restaurante.features.suppliers.exceptions.SupplierNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.OptimisticLockException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -55,6 +58,7 @@ public class GlobalExceptionHandler {
             ProductNotFoundException.class,
             CategoryNotFoundException.class,
             InventoryNotFoundException.class,
+            SupplierNotFoundException.class,
             EntityNotFoundException.class,
     })
     public ResponseEntity<ApiResponse<Object>> handleNotFound(RuntimeException ex) {
@@ -121,13 +125,33 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGenericException(Exception ex) {
-        ex.printStackTrace(); // log completo
+        ex.printStackTrace();
         return buildResponse("Ocurrió un error inesperado", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     @ExceptionHandler(InventoryAlreadyExistsException.class)
     public ResponseEntity<ApiResponse<Object>> handleInventoryAlreadyExists(InventoryAlreadyExistsException ex) {
         return buildResponse(ex.getMessage(), HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler({
+            InvalidQuantityException.class,
+            InvalidMovementTypeException.class,
+            InsufficientStockException.class
+    })
+    public ResponseEntity<ApiResponse<Object>> handleInventoryValidation(RuntimeException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler({
+            OptimisticLockException.class,
+            OptimisticLockingFailureException.class
+    })
+    public ResponseEntity<ApiResponse<Object>> handleOptimisticLock(RuntimeException ex) {
+        return buildResponse(
+                "Conflicto de concurrencia: otro proceso modificó el recurso. Intente nuevamente.",
+                HttpStatus.CONFLICT
+        );
     }
 
 }

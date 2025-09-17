@@ -13,9 +13,4 @@ public class IngredientRequest {
     @NotNull(message = "La unidad es obligatoria")
     private Long unitId;
 
-    @NotNull(message = "El stock es obligatorio")
-    @Min(value = 0, message = "El stock no puede ser negativo")
-    private Integer stock;
-
-    private Integer minStock;
 }

@@ -6,10 +6,13 @@ import lombok.Data;
 @Data
 public class SupplierRequest {
 
-    @NotBlank(message = "El nombre del proveedor es obligatorio")
-    private String name;
+    @NotBlank(message = "El nombre de la empresa es obligatorio")
+    private String companyName;
 
-    private String contact;
+    @NotBlank(message = "El nombre del contacto es obligatorio")
+    private String contactName;
+
+    private String phone;
 
     private String address;
 }

@@ -30,8 +30,11 @@ public class SupplierController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public SupplierResponse create(@Valid @RequestBody SupplierRequest request) {
-        return supplierService.create(request);
+    public SupplierResponse create(
+            @Valid @RequestBody SupplierRequest request,
+            @RequestParam Long userId
+    ) {
+        return supplierService.create(request, userId);
     }
 
     @PutMapping("/{id}")

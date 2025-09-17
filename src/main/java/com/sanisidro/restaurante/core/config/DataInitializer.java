@@ -20,6 +20,13 @@ import com.sanisidro.restaurante.features.products.repository.*;
 import com.sanisidro.restaurante.features.restaurant.enums.TableStatus;
 import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
 import com.sanisidro.restaurante.features.restaurant.repository.TableRepository;
+import com.sanisidro.restaurante.features.suppliers.enums.PurchaseOrderStatus;
+import com.sanisidro.restaurante.features.suppliers.model.PurchaseOrder;
+import com.sanisidro.restaurante.features.suppliers.model.PurchaseOrderDetail;
+import com.sanisidro.restaurante.features.suppliers.model.Supplier;
+import com.sanisidro.restaurante.features.suppliers.repository.PurchaseOrderDetailRepository;
+import com.sanisidro.restaurante.features.suppliers.repository.PurchaseOrderRepository;
+import com.sanisidro.restaurante.features.suppliers.repository.SupplierRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -31,6 +38,7 @@ import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 @Component
 @Profile("dev")
@@ -53,6 +61,9 @@ public class DataInitializer implements CommandLineRunner {
     private final ProductIngredientRepository productIngredientRepository;
     private final InventoryRepository inventoryRepository;
     private final InventoryMovementRepository inventoryMovementRepository;
+    private final SupplierRepository supplierRepository;
+    private final PurchaseOrderRepository purchaseOrderRepository;
+    private final PurchaseOrderDetailRepository purchaseOrderDetailRepository;
 
 
     @Override
@@ -69,6 +80,9 @@ public class DataInitializer implements CommandLineRunner {
         initProductIngredients();
         initInventories();
         initInventoryMovements();
+        initSupplierUsers();
+        initSuppliers();
+        initPurchaseOrders();
     }
 
     private void initRoles() {
@@ -623,13 +637,13 @@ public class DataInitializer implements CommandLineRunner {
         Unit ml = unitRepository.findBySymbol("ml").orElseThrow();
 
         List<Ingredient> ingredients = List.of(
-                Ingredient.builder().name("Pollo").unit(g).stock(5000).minStock(1000).build(),
-                Ingredient.builder().name("Papa").unit(g).stock(10000).minStock(2000).build(),
-                Ingredient.builder().name("Arroz").unit(g).stock(15000).minStock(3000).build(),
-                Ingredient.builder().name("Aceite").unit(ml).stock(5000).minStock(1000).build(),
-                Ingredient.builder().name("Pan").unit(u).stock(100).minStock(20).build(),
-                Ingredient.builder().name("Queso").unit(g).stock(3000).minStock(500).build(),
-                Ingredient.builder().name("Carne de res").unit(g).stock(5000).minStock(1000).build()
+                Ingredient.builder().name("Pollo").unit(g).build(),
+                Ingredient.builder().name("Papa").unit(g).build(),
+                Ingredient.builder().name("Arroz").unit(g).build(),
+                Ingredient.builder().name("Aceite").unit(ml).build(),
+                Ingredient.builder().name("Pan").unit(u).build(),
+                Ingredient.builder().name("Queso").unit(g).build(),
+                Ingredient.builder().name("Carne de res").unit(g).build()
         );
 
         ingredientRepository.saveAll(ingredients);
@@ -680,14 +694,26 @@ public class DataInitializer implements CommandLineRunner {
         List<Inventory> inventories = ingredients.stream()
                 .map(ing -> Inventory.builder()
                         .ingredient(ing)
-                        .currentStock(ing.getStock())
-                        .minimumStock(ing.getMinStock())
+                        .currentStock(BigDecimal.valueOf(0.0))
+                        .minimumStock(getDefaultMinStock(ing.getName()))
                         .build())
                 .toList();
 
         inventoryRepository.saveAll(inventories);
         log.info(">>> Inventarios inicializados correctamente");
     }
+
+    private BigDecimal getDefaultMinStock(String name) {
+        return switch (name) {
+            case "Pollo", "Aceite", "Carne de res" -> BigDecimal.valueOf(1000.0);
+            case "Papa" -> BigDecimal.valueOf(2000.0);
+            case "Arroz" -> BigDecimal.valueOf(3000.0);
+            case "Pan" -> BigDecimal.valueOf(20.0);
+            case "Queso" -> BigDecimal.valueOf(500.0);
+            default -> BigDecimal.valueOf(0.0);
+        };
+    }
+
 
     private void initInventoryMovements() {
         if (inventoryMovementRepository.count() > 0) {
@@ -704,15 +730,15 @@ public class DataInitializer implements CommandLineRunner {
                 InventoryMovement.builder()
                         .ingredient(pollo)
                         .type(MovementType.IN)
-                        .quantity(2000)
+                        .quantity(BigDecimal.valueOf(2000))
                         .reason("Compra inicial de pollo")
                         .source(MovementSource.PURCHASE)
                         .referenceId(null)
                         .build(),
                 InventoryMovement.builder()
                         .ingredient(papa)
-                        .type(MovementType.OUT) // salida de stock
-                        .quantity(500)
+                        .type(MovementType.OUT)
+                        .quantity(BigDecimal.valueOf(500))
                         .reason("Consumo en pruebas de cocina")
                         .source(MovementSource.MANUAL)
                         .referenceId(null)
@@ -721,6 +747,127 @@ public class DataInitializer implements CommandLineRunner {
 
         inventoryMovementRepository.saveAll(movements);
         log.info(">>> Movimientos de inventario inicializados");
+    }
+
+    private void initSupplierUsers() {
+        Role supplierRole = roleRepository.findByName("ROLE_SUPPLIER")
+                .orElseGet(() -> roleRepository.save(new Role(null, "ROLE_SUPPLIER")));
+
+        if (userRepository.findByEmail("sanfernado@gmail.com").isEmpty()) {
+            User sanFernandoUser = User.builder()
+                    .username("sanfernando_user")
+                    .firstName("Carlos")
+                    .lastName("Ramirez")
+                    .email("sanfernado@gmail.com")
+                    .password(passwordEncoder.encode("password123"))
+                    .roles(Set.of(supplierRole))
+                    .enabled(true)
+                    .build();
+            userRepository.save(sanFernandoUser);
+        }
+
+        if (userRepository.findByEmail("gloria_user@gmail.com").isEmpty()) {
+            User gloriaUser = User.builder()
+                    .username("gloria_user")
+                    .firstName("Ana")
+                    .lastName("Torres")
+                    .email("gloria_user@gmail.com")
+                    .password(passwordEncoder.encode("password123"))
+                    .roles(Set.of(supplierRole))
+                    .enabled(true)
+                    .build();
+            userRepository.save(gloriaUser);
+        }
+    }
+
+    private void initSuppliers() {
+        User sanFernandoUser = userRepository.findByEmail("sanfernado@gmail.com").orElseThrow();
+        User gloriaUser = userRepository.findByEmail("gloria_user@gmail.com").orElseThrow();
+
+        if (supplierRepository.findByCompanyName("San Fernando").isEmpty()) {
+            Supplier sanFernandoSupplier = Supplier.builder()
+                    .companyName("San Fernando")
+                    .contactName("Carlos Ramirez")
+                    .phone("999111222")
+                    .address("Av. Industrial 123, Lima")
+                    .user(sanFernandoUser)
+                    .build();
+
+            supplierRepository.save(sanFernandoSupplier);
+        }
+
+        if (supplierRepository.findByCompanyName("Gloria").isEmpty()) {
+            Supplier gloriaSupplier = Supplier.builder()
+                    .companyName("Gloria")
+                    .contactName("Ana Torres")
+                    .phone("999333444")
+                    .address("Av. Colonial 456, Callao")
+                    .user(gloriaUser)
+                    .build();
+
+            supplierRepository.save(gloriaSupplier);
+        }
+    }
+
+    private void initPurchaseOrders() {
+        if (purchaseOrderRepository.count() > 0) {
+            log.info(">>> Órdenes de compra ya inicializadas");
+            return;
+        }
+
+        log.info(">>> Inicializando órdenes de compra...");
+
+        Supplier sanFernando = supplierRepository.findByCompanyName("San Fernando")
+                .orElseThrow();
+        Supplier gloria = supplierRepository.findByCompanyName("Gloria")
+                .orElseThrow();
+
+        Ingredient pollo = ingredientRepository.findByName("Pollo").orElseThrow();
+        Ingredient papa = ingredientRepository.findByName("Papa").orElseThrow();
+        Ingredient arroz = ingredientRepository.findByName("Arroz").orElseThrow();
+
+        PurchaseOrder order1 = PurchaseOrder.builder()
+                .supplier(sanFernando)
+                .date(java.time.LocalDateTime.now().minusDays(7))
+                .status(PurchaseOrderStatus.RECEIVED)
+                .total(BigDecimal.valueOf(5000))
+                .build();
+
+        PurchaseOrderDetail detail1 = PurchaseOrderDetail.builder()
+                .order(order1)
+                .ingredient(pollo)
+                .quantity(1000)
+                .unitPrice(BigDecimal.valueOf(10.0))
+                .build();
+
+        PurchaseOrderDetail detail2 = PurchaseOrderDetail.builder()
+                .order(order1)
+                .ingredient(papa)
+                .quantity(500)
+                .unitPrice(BigDecimal.valueOf(2.0))
+                .build();
+
+        order1.replaceDetails(Set.of(detail1, detail2));
+        purchaseOrderRepository.save(order1);
+
+        PurchaseOrder order2 = PurchaseOrder.builder()
+                .supplier(gloria)
+                .date(java.time.LocalDateTime.now().minusDays(3))
+                .status(PurchaseOrderStatus.PENDING)
+                .total(BigDecimal.valueOf(2000))
+                .build();
+
+        PurchaseOrderDetail detail3 = PurchaseOrderDetail.builder()
+                .order(order2)
+                .ingredient(arroz)
+                .quantity(800)
+                .unitPrice(BigDecimal.valueOf(3.5))
+                .build();
+
+        order2.replaceDetails(Set.of(detail3));
+        purchaseOrderRepository.save(order2);
+
+        log.info(">>> Órdenes de compra inicializadas correctamente");
     }
 
 }

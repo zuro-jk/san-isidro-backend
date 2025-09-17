@@ -23,9 +23,4 @@ public class Ingredient {
     @JoinColumn(name = "unit_id", nullable = false)
     private Unit unit;
 
-    @Column(nullable = false)
-    private Integer stock;
-
-    @Column(name = "min_stock")
-    private Integer minStock;
 }

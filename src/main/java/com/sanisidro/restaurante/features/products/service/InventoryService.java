@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -51,7 +52,6 @@ public class InventoryService {
                         "Ingrediente no encontrado con id: " + request.getIngredientId()
                 ));
 
-        // Verificar si ya existe inventario para ese ingrediente
         inventoryRepository.findByIngredientId(request.getIngredientId())
                 .ifPresent(inv -> {
                     throw new InventoryAlreadyExistsException(
@@ -69,7 +69,6 @@ public class InventoryService {
         return mapToResponse(savedInventory);
     }
 
-
     @Transactional
     public InventoryResponse update(Long id, InventoryUpdateRequest request) {
         validateRequest(request);
@@ -83,19 +82,20 @@ public class InventoryService {
         Inventory updatedInventory = inventoryRepository.save(inventory);
         return mapToResponse(updatedInventory);
     }
+
     @Transactional
     public InventoryResponse partialUpdate(Long id, InventoryCreateRequest request) {
         Inventory inventory = inventoryRepository.findById(id)
                 .orElseThrow(() -> new InventoryNotFoundException("Inventario no encontrado con id: " + id));
 
         if (request.getCurrentStock() != null) {
-            if (request.getCurrentStock() < 0)
+            if (request.getCurrentStock().compareTo(BigDecimal.ZERO) < 0)
                 throw new IllegalArgumentException("El stock actual no puede ser negativo");
             inventory.setCurrentStock(request.getCurrentStock());
         }
 
         if (request.getMinimumStock() != null) {
-            if (request.getMinimumStock() < 0)
+            if (request.getMinimumStock().compareTo(BigDecimal.ZERO) < 0)
                 throw new IllegalArgumentException("El stock mínimo no puede ser negativo");
             inventory.setMinimumStock(request.getMinimumStock());
         }
@@ -118,11 +118,11 @@ public class InventoryService {
         validateStock(request.getCurrentStock(), request.getMinimumStock());
     }
 
-    private void validateStock(Integer currentStock, Integer minimumStock) {
-        if (currentStock != null && currentStock < 0) {
+    private void validateStock(BigDecimal currentStock, BigDecimal minimumStock) {
+        if (currentStock != null && currentStock.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("El stock actual no puede ser negativo");
         }
-        if (minimumStock != null && minimumStock < 0) {
+        if (minimumStock != null && minimumStock.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("El stock mínimo no puede ser negativo");
         }
     }

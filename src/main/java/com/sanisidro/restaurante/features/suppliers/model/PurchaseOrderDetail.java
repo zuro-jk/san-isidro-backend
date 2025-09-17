@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.features.suppliers.model;
 
+import com.sanisidro.restaurante.features.products.model.Ingredient;
 import com.sanisidro.restaurante.features.products.model.Product;
 import jakarta.persistence.*;
 import lombok.*;
@@ -25,8 +26,8 @@ public class PurchaseOrderDetail {
     private PurchaseOrder order;
 
     @ManyToOne(optional = false)
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+    @JoinColumn(name = "ingredient_id", nullable = false)
+    private Ingredient ingredient;
 
     @Column(name = "quantity", nullable = false)
     private Integer quantity;

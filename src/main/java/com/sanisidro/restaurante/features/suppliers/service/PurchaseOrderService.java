@@ -1,21 +1,24 @@
 package com.sanisidro.restaurante.features.suppliers.service;
 
 import com.sanisidro.restaurante.core.exceptions.BadRequestException;
-import com.sanisidro.restaurante.features.products.model.Product;
-import com.sanisidro.restaurante.features.products.repository.ProductRepository;
+import com.sanisidro.restaurante.features.products.exceptions.IngredientNotFoundException;
+import com.sanisidro.restaurante.features.products.exceptions.InventoryNotFoundException;
+import com.sanisidro.restaurante.features.products.model.Ingredient;
+import com.sanisidro.restaurante.features.products.model.Inventory;
+import com.sanisidro.restaurante.features.products.repository.IngredientRepository;
+import com.sanisidro.restaurante.features.products.repository.InventoryRepository;
 import com.sanisidro.restaurante.features.suppliers.dto.purchaseorder.request.PurchaseOrderRequest;
 import com.sanisidro.restaurante.features.suppliers.dto.purchaseorder.response.PurchaseOrderResponse;
 import com.sanisidro.restaurante.features.suppliers.dto.purchaseorderdetail.response.PurchaseOrderDetailInOrderResponse;
-import com.sanisidro.restaurante.features.suppliers.dto.purchaseorderdetail.response.PurchaseOrderDetailResponse;
 import com.sanisidro.restaurante.features.suppliers.enums.PurchaseOrderStatus;
+import com.sanisidro.restaurante.features.suppliers.exceptions.PurchaseOrderNotFoundException;
+import com.sanisidro.restaurante.features.suppliers.exceptions.SupplierNotFoundException;
 import com.sanisidro.restaurante.features.suppliers.model.PurchaseOrder;
 import com.sanisidro.restaurante.features.suppliers.model.PurchaseOrderDetail;
 import com.sanisidro.restaurante.features.suppliers.model.Supplier;
 import com.sanisidro.restaurante.features.suppliers.repository.PurchaseOrderRepository;
 import com.sanisidro.restaurante.features.suppliers.repository.SupplierRepository;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cglib.core.Local;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,7 +35,8 @@ public class PurchaseOrderService {
 
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final SupplierRepository supplierRepository;
-    private final ProductRepository productRepository;
+    private final IngredientRepository ingredientRepository;
+    private final InventoryRepository inventoryRepository;
 
     public List<PurchaseOrderResponse> getAll() {
         return purchaseOrderRepository.findAll().stream()
@@ -42,14 +46,14 @@ public class PurchaseOrderService {
 
     public PurchaseOrderResponse getById(Long id) {
         PurchaseOrder order = purchaseOrderRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Orden de compra no encontrada con id: " + id));
+                .orElseThrow(() -> new PurchaseOrderNotFoundException("Orden de compra no encontrada con id: " + id));
         return mapToResponse(order);
     }
 
     @Transactional
     public PurchaseOrderResponse create(PurchaseOrderRequest request) {
         Supplier supplier = supplierRepository.findById(request.getSupplierId())
-                .orElseThrow(() -> new EntityNotFoundException("Proveedor no encontrado con id: " + request.getSupplierId()));
+                .orElseThrow(() -> new SupplierNotFoundException("Proveedor no encontrado con id: " + request.getSupplierId()));
 
         PurchaseOrderStatus status = parseStatus(request.getStatus());
 
@@ -59,88 +63,106 @@ public class PurchaseOrderService {
                 .status(status)
                 .build();
 
-        Set<PurchaseOrderDetail> details = new LinkedHashSet<>();
-        request.getDetails().forEach(d -> {
-            Product product = productRepository.findById(d.getProductId())
-                    .orElseThrow(() -> new EntityNotFoundException(
-                            "Producto no encontrado con id: " + d.getProductId()));
-
-            PurchaseOrderDetail detail = PurchaseOrderDetail.builder()
-                    .order(order)
-                    .product(product)
-                    .quantity(d.getQuantity())
-                    .unitPrice(d.getUnitPrice())
-                    .build();
-
-            details.add(detail);
-        });
-
+        Set<PurchaseOrderDetail> details = buildDetails(request, order);
         order.replaceDetails(details);
+        order.setTotal(calculateTotal(details));
 
-        BigDecimal total = details.stream()
-                .map(d -> d.getUnitPrice().multiply(BigDecimal.valueOf(d.getQuantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        PurchaseOrder savedOrder = purchaseOrderRepository.save(order);
 
-        order.setTotal(total);
+        if (status == PurchaseOrderStatus.RECEIVED) {
+            details.forEach(d -> updateInventoryStock(d.getIngredient().getId(), BigDecimal.valueOf(d.getQuantity()), true));
+        }
 
-        return mapToResponse(purchaseOrderRepository.save(order));
+        return mapToResponse(savedOrder);
     }
 
     @Transactional
     public PurchaseOrderResponse update(Long id, PurchaseOrderRequest request) {
         PurchaseOrder order = purchaseOrderRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "Orden de compra no encontrada con id: " + id));
+                .orElseThrow(() -> new PurchaseOrderNotFoundException("Orden de compra no encontrada con id: " + id));
+
+        PurchaseOrderStatus oldStatus = order.getStatus();
+        PurchaseOrderStatus newStatus = parseStatus(request.getStatus());
 
         Supplier supplier = supplierRepository.findById(request.getSupplierId())
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "Proveedor no encontrado con id: " + request.getSupplierId()));
-
-        PurchaseOrderStatus status = parseStatus(request.getStatus());
+                .orElseThrow(() -> new SupplierNotFoundException("Proveedor no encontrado con id: " + request.getSupplierId()));
 
         order.setSupplier(supplier);
         order.setDate(LocalDateTime.now());
-        order.setStatus(status);
+        order.setStatus(newStatus);
 
+        Set<PurchaseOrderDetail> newDetails = buildDetails(request, order);
+
+        if (oldStatus == PurchaseOrderStatus.RECEIVED && newStatus != PurchaseOrderStatus.RECEIVED) {
+            order.getDetails().forEach(d -> updateInventoryStock(d.getIngredient().getId(), BigDecimal.valueOf(d.getQuantity()), false));
+        }
+
+        order.replaceDetails(newDetails);
+        order.setTotal(calculateTotal(newDetails));
+
+        PurchaseOrder updatedOrder = purchaseOrderRepository.save(order);
+
+        if (oldStatus != PurchaseOrderStatus.RECEIVED && newStatus == PurchaseOrderStatus.RECEIVED) {
+            newDetails.forEach(d -> updateInventoryStock(d.getIngredient().getId(), BigDecimal.valueOf(d.getQuantity()), true));
+        }
+
+        return mapToResponse(updatedOrder);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        PurchaseOrder order = purchaseOrderRepository.findById(id)
+                .orElseThrow(() -> new PurchaseOrderNotFoundException("Orden de compra no encontrada con id: " + id));
+
+        if (order.getStatus() == PurchaseOrderStatus.RECEIVED) {
+            order.getDetails().forEach(d -> updateInventoryStock(d.getIngredient().getId(), BigDecimal.valueOf(d.getQuantity()), false));
+        }
+
+        purchaseOrderRepository.delete(order);
+    }
+
+    private void updateInventoryStock(Long ingredientId, BigDecimal qty, boolean increase) {
+        Inventory inventory = inventoryRepository.findByIngredientId(ingredientId)
+                .orElseThrow(() -> new InventoryNotFoundException("Inventario no encontrado para ingrediente: " + ingredientId));
+
+        if (increase) {
+            inventory.increaseStock(qty);
+        } else {
+            inventory.decreaseStock(qty);
+        }
+
+        inventoryRepository.saveAndFlush(inventory);
+    }
+
+    private Set<PurchaseOrderDetail> buildDetails(PurchaseOrderRequest request, PurchaseOrder order) {
         Set<PurchaseOrderDetail> details = new LinkedHashSet<>();
         request.getDetails().forEach(d -> {
-            Product product = productRepository.findById(d.getProductId())
-                    .orElseThrow(() -> new EntityNotFoundException(
-                            "Producto no encontrado con id: " + d.getProductId()));
+            Ingredient ingredient = ingredientRepository.findById(d.getIngredientId())
+                    .orElseThrow(() -> new IngredientNotFoundException("Ingrediente no encontrado con id: " + d.getIngredientId()));
 
             PurchaseOrderDetail detail = PurchaseOrderDetail.builder()
                     .order(order)
-                    .product(product)
+                    .ingredient(ingredient)
                     .quantity(d.getQuantity())
                     .unitPrice(d.getUnitPrice())
                     .build();
 
             details.add(detail);
         });
-
-        order.replaceDetails(details);
-
-        BigDecimal total = order.getDetails().stream()
-                .map(det -> det.getUnitPrice().multiply(BigDecimal.valueOf(det.getQuantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        order.setTotal(total);
-
-        return mapToResponse(purchaseOrderRepository.save(order));
+        return details;
     }
 
-    public void delete(Long id) {
-        if (!purchaseOrderRepository.existsById(id)) {
-            throw new EntityNotFoundException("Orden de compra no encontrada con id: " + id);
-        }
-        purchaseOrderRepository.deleteById(id);
+    private BigDecimal calculateTotal(Set<PurchaseOrderDetail> details) {
+        return details.stream()
+                .map(d -> d.getUnitPrice().multiply(BigDecimal.valueOf(d.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private PurchaseOrderResponse mapToResponse(PurchaseOrder order) {
         return PurchaseOrderResponse.builder()
                 .id(order.getId())
                 .supplierId(order.getSupplier().getId())
-                .supplierName(order.getSupplier().getName())
+                .supplierName(order.getSupplier().getCompanyName())
                 .date(order.getDate())
                 .status(order.getStatus())
                 .total(order.getTotal())
@@ -148,8 +170,8 @@ public class PurchaseOrderService {
                         order.getDetails().stream()
                                 .map(d -> PurchaseOrderDetailInOrderResponse.builder()
                                         .id(d.getId())
-                                        .productId(d.getProduct().getId())
-                                        .productName(d.getProduct().getName())
+                                        .ingredientId(d.getIngredient().getId())
+                                        .ingredientName(d.getIngredient().getName())
                                         .quantity(d.getQuantity())
                                         .unitPrice(d.getUnitPrice())
                                         .build()
@@ -159,10 +181,6 @@ public class PurchaseOrderService {
                 .build();
     }
 
-    /**
-     * Convierte un String en PurchaseOrderStatus.
-     * Si es null o vacío, devuelve PENDING como valor por defecto.
-     */
     private PurchaseOrderStatus parseStatus(String status) {
         if (status == null || status.isBlank()) {
             return PurchaseOrderStatus.PENDING;
@@ -176,5 +194,4 @@ public class PurchaseOrderService {
             );
         }
     }
-
 }

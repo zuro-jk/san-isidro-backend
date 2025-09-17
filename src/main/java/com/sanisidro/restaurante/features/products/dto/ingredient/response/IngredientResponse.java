@@ -13,6 +13,4 @@ public class IngredientResponse {
     private Long unitId;
     private String unitName;
     private String unitSymbol;
-    private Integer stock;
-    private Integer minStock;
 }
