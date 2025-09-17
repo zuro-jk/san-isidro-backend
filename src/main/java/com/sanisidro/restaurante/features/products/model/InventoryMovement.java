@@ -14,25 +14,21 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@ToString(onlyExplicitlyIncluded = true)
 public class InventoryMovement {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "inventory_movement_id")
     private Long id;
 
     @ManyToOne(optional = false)
-    @JoinColumn(name = "product_id", nullable = false)
-    @ToString.Include
-    private Product product;
+    @JoinColumn(name = "ingredient_id", nullable = false)
+    private Ingredient ingredient;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "type", length = 50, nullable = false)
+    @Column(nullable = false)
     private MovementType type;
 
-    @Column(name = "quantity", nullable = false)
+    @Column(nullable = false)
     private Integer quantity;
 
     @Column(nullable = false)
@@ -42,7 +38,7 @@ public class InventoryMovement {
     private String reason;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "source", length = 50, nullable = false)
+    @Column(nullable = false)
     private MovementSource source;
 
     @Column(name = "reference_id")
@@ -54,9 +50,7 @@ public class InventoryMovement {
     @PrePersist
     protected void onCreate() {
         LocalDateTime now = LocalDateTime.now();
-        if (date == null) {
-            date = now;
-        }
+        if (date == null) date = now;
         createdAt = now;
     }
 }

@@ -4,10 +4,7 @@ import com.sanisidro.restaurante.core.aws.exception.AccessDeniedException;
 import com.sanisidro.restaurante.core.aws.exception.FileNotFoundException;
 import com.sanisidro.restaurante.core.aws.exception.FileUploadException;
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
-import com.sanisidro.restaurante.features.products.exceptions.CategoryNotFoundException;
-import com.sanisidro.restaurante.features.products.exceptions.DuplicateProductException;
-import com.sanisidro.restaurante.features.products.exceptions.InventoryNotFoundException;
-import com.sanisidro.restaurante.features.products.exceptions.ProductNotFoundException;
+import com.sanisidro.restaurante.features.products.exceptions.*;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -126,6 +123,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleGenericException(Exception ex) {
         ex.printStackTrace(); // log completo
         return buildResponse("Ocurrió un error inesperado", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(InventoryAlreadyExistsException.class)
+    public ResponseEntity<ApiResponse<Object>> handleInventoryAlreadyExists(InventoryAlreadyExistsException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.CONFLICT);
     }
 
 }

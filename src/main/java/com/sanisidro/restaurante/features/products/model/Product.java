@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "products")
@@ -32,4 +34,13 @@ public class Product {
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<ProductIngredient> ingredients = new LinkedHashSet<>();
+
+    public void replaceIngredients(Set<ProductIngredient> newIngredients) {
+        ingredients.clear();
+        ingredients.addAll(newIngredients);
+    }
 }
+

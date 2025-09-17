@@ -2,6 +2,7 @@ package com.sanisidro.restaurante.features.products.controller;
 
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
 import com.sanisidro.restaurante.features.products.dto.product.request.ProductRequest;
+import com.sanisidro.restaurante.features.products.dto.product.response.ProductDetailResponse;
 import com.sanisidro.restaurante.features.products.dto.product.response.ProductResponse;
 import com.sanisidro.restaurante.features.products.service.ProductService;
 import jakarta.validation.Valid;
@@ -26,8 +27,8 @@ public class ProductController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ProductResponse>> getById(@PathVariable Long id) {
-        ProductResponse product = productService.getById(id);
+    public ResponseEntity<ApiResponse<ProductDetailResponse>> getById(@PathVariable Long id) {
+        ProductDetailResponse product = productService.getById(id);
         return ResponseEntity.ok(new ApiResponse<>(true, "Producto obtenido", product));
     }
 
@@ -38,16 +39,16 @@ public class ProductController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<ProductResponse>> create(@Valid @RequestBody ProductRequest request) {
-        ProductResponse product = productService.create(request);
+    public ResponseEntity<ApiResponse<ProductDetailResponse>> create(@Valid @RequestBody ProductRequest request) {
+        ProductDetailResponse product = productService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ApiResponse<>(true, "Producto creado", product));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<ProductResponse>> update(@PathVariable Long id,
-                                                               @Valid @RequestBody ProductRequest request) {
-        ProductResponse product = productService.update(id, request);
+    public ResponseEntity<ApiResponse<ProductDetailResponse>> update(@PathVariable Long id,
+                                                                     @Valid @RequestBody ProductRequest request) {
+        ProductDetailResponse product = productService.update(id, request);
         return ResponseEntity.ok(new ApiResponse<>(true, "Producto actualizado", product));
     }
 

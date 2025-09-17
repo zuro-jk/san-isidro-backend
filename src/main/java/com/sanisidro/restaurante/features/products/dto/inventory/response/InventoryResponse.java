@@ -11,8 +11,10 @@ import java.time.LocalDateTime;
 @Builder
 public class InventoryResponse {
     private Long id;
-    private Long productId;
-    private String productName;
+    private Long ingredientId;
+    private String ingredientName;
+    private String unitName;
+    private String unitSymbol;
     private Integer currentStock;
     private Integer minimumStock;
     private LocalDateTime createdAt;

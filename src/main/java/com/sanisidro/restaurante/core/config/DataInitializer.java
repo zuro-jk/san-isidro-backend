@@ -7,16 +7,16 @@ import com.sanisidro.restaurante.core.security.repository.UserRepository;
 import com.sanisidro.restaurante.features.customers.enums.LoyaltyRuleType;
 import com.sanisidro.restaurante.features.customers.model.LoyaltyRule;
 import com.sanisidro.restaurante.features.customers.repository.LoyaltyRuleRepository;
+import com.sanisidro.restaurante.features.orders.enums.MovementSource;
 import com.sanisidro.restaurante.features.orders.model.OrderStatus;
 import com.sanisidro.restaurante.features.orders.model.OrderStatusTranslation;
 import com.sanisidro.restaurante.features.orders.model.OrderType;
 import com.sanisidro.restaurante.features.orders.model.OrderTypeTranslation;
 import com.sanisidro.restaurante.features.orders.repository.OrderStatusRepository;
 import com.sanisidro.restaurante.features.orders.repository.OrderTypeRepository;
-import com.sanisidro.restaurante.features.products.model.Category;
-import com.sanisidro.restaurante.features.products.model.Product;
-import com.sanisidro.restaurante.features.products.repository.CategoryRepository;
-import com.sanisidro.restaurante.features.products.repository.ProductRepository;
+import com.sanisidro.restaurante.features.products.enums.MovementType;
+import com.sanisidro.restaurante.features.products.model.*;
+import com.sanisidro.restaurante.features.products.repository.*;
 import com.sanisidro.restaurante.features.restaurant.enums.TableStatus;
 import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
 import com.sanisidro.restaurante.features.restaurant.repository.TableRepository;
@@ -48,6 +48,12 @@ public class DataInitializer implements CommandLineRunner {
     private final OrderTypeRepository orderTypeRepository;
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
+    private final UnitRepository unitRepository;
+    private final IngredientRepository ingredientRepository;
+    private final ProductIngredientRepository productIngredientRepository;
+    private final InventoryRepository inventoryRepository;
+    private final InventoryMovementRepository inventoryMovementRepository;
+
 
     @Override
     public void run(String... args) throws Exception {
@@ -58,6 +64,11 @@ public class DataInitializer implements CommandLineRunner {
         initOrderStatuses();
         initOrderTypes();
         initCategoriesAndProducts();
+        initUnits();
+        initIngredients();
+        initProductIngredients();
+        initInventories();
+        initInventoryMovements();
     }
 
     private void initRoles() {
@@ -576,4 +587,140 @@ public class DataInitializer implements CommandLineRunner {
         productRepository.saveAll(products);
         log.info(">>> Productos inicializados correctamente");
     }
+
+    private void initUnits() {
+        if (unitRepository.count() > 0) {
+            log.info(">>> Unidades ya inicializadas");
+            return;
+        }
+
+        log.info(">>> Inicializando unidades...");
+
+        List<Unit> units = List.of(
+                Unit.builder().name("Gramo").symbol("g").build(),
+                Unit.builder().name("Kilogramo").symbol("kg").build(),
+                Unit.builder().name("Litro").symbol("l").build(),
+                Unit.builder().name("Mililitro").symbol("ml").build(),
+                Unit.builder().name("Unidad").symbol("u").build(),
+                Unit.builder().name("Cucharada").symbol("tbsp").build(),
+                Unit.builder().name("Cucharadita").symbol("tsp").build()
+        );
+
+        unitRepository.saveAll(units);
+        log.info(">>> Unidades inicializadas correctamente");
+    }
+
+    private void initIngredients() {
+        if (ingredientRepository.count() > 0) {
+            log.info(">>> Ingredientes ya inicializados");
+            return;
+        }
+
+        log.info(">>> Inicializando ingredientes...");
+
+        Unit g = unitRepository.findBySymbol("g").orElseThrow();
+        Unit u = unitRepository.findBySymbol("u").orElseThrow();
+        Unit ml = unitRepository.findBySymbol("ml").orElseThrow();
+
+        List<Ingredient> ingredients = List.of(
+                Ingredient.builder().name("Pollo").unit(g).stock(5000).minStock(1000).build(),
+                Ingredient.builder().name("Papa").unit(g).stock(10000).minStock(2000).build(),
+                Ingredient.builder().name("Arroz").unit(g).stock(15000).minStock(3000).build(),
+                Ingredient.builder().name("Aceite").unit(ml).stock(5000).minStock(1000).build(),
+                Ingredient.builder().name("Pan").unit(u).stock(100).minStock(20).build(),
+                Ingredient.builder().name("Queso").unit(g).stock(3000).minStock(500).build(),
+                Ingredient.builder().name("Carne de res").unit(g).stock(5000).minStock(1000).build()
+        );
+
+        ingredientRepository.saveAll(ingredients);
+        log.info(">>> Ingredientes inicializados correctamente");
+    }
+
+    private void initProductIngredients() {
+        if (productIngredientRepository.count() > 0) {
+            log.info(">>> ProductIngredients ya inicializados");
+            return;
+        }
+
+        log.info(">>> Inicializando relaciones producto-ingredientes...");
+
+        Product hamburguesa = productRepository.findByName("Hamburguesa Clásica").orElseThrow();
+        Product lomoSaltado = productRepository.findByName("Lomo Saltado").orElseThrow();
+
+        Ingredient carne = ingredientRepository.findByName("Carne de res").orElseThrow();
+        Ingredient papa = ingredientRepository.findByName("Papa").orElseThrow();
+        Ingredient arroz = ingredientRepository.findByName("Arroz").orElseThrow();
+        Ingredient pan = ingredientRepository.findByName("Pan").orElseThrow();
+        Ingredient queso = ingredientRepository.findByName("Queso").orElseThrow();
+
+        List<ProductIngredient> relations = List.of(
+                ProductIngredient.builder().product(hamburguesa).ingredient(carne).quantity(200.0).build(),
+                ProductIngredient.builder().product(hamburguesa).ingredient(pan).quantity(1.0).build(),
+                ProductIngredient.builder().product(hamburguesa).ingredient(queso).quantity(30.0).build(),
+
+                ProductIngredient.builder().product(lomoSaltado).ingredient(carne).quantity(150.0).build(),
+                ProductIngredient.builder().product(lomoSaltado).ingredient(papa).quantity(200.0).build(),
+                ProductIngredient.builder().product(lomoSaltado).ingredient(arroz).quantity(150.0).build()
+        );
+
+        productIngredientRepository.saveAll(relations);
+        log.info(">>> Relaciones producto-ingredientes inicializadas");
+    }
+
+    private void initInventories() {
+        if (inventoryRepository.count() > 0) {
+            log.info(">>> Inventarios ya inicializados");
+            return;
+        }
+
+        log.info(">>> Inicializando inventarios...");
+
+        List<Ingredient> ingredients = ingredientRepository.findAll();
+
+        List<Inventory> inventories = ingredients.stream()
+                .map(ing -> Inventory.builder()
+                        .ingredient(ing)
+                        .currentStock(ing.getStock())
+                        .minimumStock(ing.getMinStock())
+                        .build())
+                .toList();
+
+        inventoryRepository.saveAll(inventories);
+        log.info(">>> Inventarios inicializados correctamente");
+    }
+
+    private void initInventoryMovements() {
+        if (inventoryMovementRepository.count() > 0) {
+            log.info(">>> Movimientos de inventario ya inicializados");
+            return;
+        }
+
+        log.info(">>> Inicializando movimientos de inventario...");
+
+        Ingredient pollo = ingredientRepository.findByName("Pollo").orElseThrow();
+        Ingredient papa = ingredientRepository.findByName("Papa").orElseThrow();
+
+        List<InventoryMovement> movements = List.of(
+                InventoryMovement.builder()
+                        .ingredient(pollo)
+                        .type(MovementType.IN)
+                        .quantity(2000)
+                        .reason("Compra inicial de pollo")
+                        .source(MovementSource.PURCHASE)
+                        .referenceId(null)
+                        .build(),
+                InventoryMovement.builder()
+                        .ingredient(papa)
+                        .type(MovementType.OUT) // salida de stock
+                        .quantity(500)
+                        .reason("Consumo en pruebas de cocina")
+                        .source(MovementSource.MANUAL)
+                        .referenceId(null)
+                        .build()
+        );
+
+        inventoryMovementRepository.saveAll(movements);
+        log.info(">>> Movimientos de inventario inicializados");
+    }
+
 }

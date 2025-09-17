@@ -26,10 +26,10 @@ public class InventoryMovementController {
         return ResponseEntity.ok(new ApiResponse<>(true, "Movimientos de inventario obtenidos", movements));
     }
 
-    @GetMapping("/product/{productId}")
-    public ResponseEntity<ApiResponse<List<InventoryMovementResponse>>> getByProduct(@PathVariable Long productId) {
-        List<InventoryMovementResponse> movements = movementService.getByProduct(productId);
-        return ResponseEntity.ok(new ApiResponse<>(true, "Movimientos de inventario por producto obtenidos", movements));
+    @GetMapping("/ingredient/{ingredientId}")
+    public ResponseEntity<ApiResponse<List<InventoryMovementResponse>>> getByIngredient(@PathVariable Long ingredientId) {
+        List<InventoryMovementResponse> movements = movementService.getByIngredient(ingredientId);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Movimientos de inventario por ingrediente obtenidos", movements));
     }
 
     @PostMapping

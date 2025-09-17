@@ -9,13 +9,13 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class InventoryRequest {
+public class InventoryCreateRequest {
 
-    @NotNull(message = "El ID del producto es obligatorio")
-    private Long productId;
+    @NotNull(message = "El ID del ingrediente es obligatorio")
+    private Long ingredientId;
 
     @NotNull(message = "El stock actual es obligatorio")
-    @Min(value = 0, message = "El stock no puede ser negativo")
+    @Min(value = 0, message = "El stock actual no puede ser negativo")
     private Integer currentStock;
 
     @NotNull(message = "El stock mínimo es obligatorio")

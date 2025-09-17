@@ -7,10 +7,10 @@ import com.sanisidro.restaurante.features.products.enums.MovementType;
 import com.sanisidro.restaurante.features.products.exceptions.*;
 import com.sanisidro.restaurante.features.products.model.Inventory;
 import com.sanisidro.restaurante.features.products.model.InventoryMovement;
-import com.sanisidro.restaurante.features.products.model.Product;
+import com.sanisidro.restaurante.features.products.model.Ingredient;
 import com.sanisidro.restaurante.features.products.repository.InventoryMovementRepository;
 import com.sanisidro.restaurante.features.products.repository.InventoryRepository;
-import com.sanisidro.restaurante.features.products.repository.ProductRepository;
+import com.sanisidro.restaurante.features.products.repository.IngredientRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +24,7 @@ public class InventoryMovementService {
 
     private final InventoryMovementRepository movementRepository;
     private final InventoryRepository inventoryRepository;
-    private final ProductRepository productRepository;
+    private final IngredientRepository ingredientRepository;
 
     public List<InventoryMovementResponse> getAll() {
         return movementRepository.findAll()
@@ -33,11 +33,11 @@ public class InventoryMovementService {
                 .toList();
     }
 
-    public List<InventoryMovementResponse> getByProduct(Long productId) {
-        productRepository.findById(productId)
-                .orElseThrow(() -> new ProductNotFoundException("Producto no encontrado con id: " + productId));
+    public List<InventoryMovementResponse> getByIngredient(Long ingredientId) {
+        ingredientRepository.findById(ingredientId)
+                .orElseThrow(() -> new IngredientNotFoundException("Ingrediente no encontrado con id: " + ingredientId));
 
-        return movementRepository.findByProductId(productId)
+        return movementRepository.findByIngredientId(ingredientId)
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
@@ -56,18 +56,18 @@ public class InventoryMovementService {
         for (InventoryMovementRequest request : batchRequest.getMovements()) {
             validateRequest(request);
 
-            Product product = productRepository.findById(request.getProductId())
-                    .orElseThrow(() -> new ProductNotFoundException("Producto no encontrado con id: " + request.getProductId()));
+            Ingredient ingredient = ingredientRepository.findById(request.getIngredientId())
+                    .orElseThrow(() -> new IngredientNotFoundException("Ingrediente no encontrado con id: " + request.getIngredientId()));
 
-            Inventory inventory = inventoryRepository.findByProductId(request.getProductId())
-                    .orElseThrow(() -> new InventoryNotFoundException("Inventario no encontrado para el producto id: " + request.getProductId()));
+            Inventory inventory = inventoryRepository.findByIngredientId(request.getIngredientId())
+                    .orElseThrow(() -> new InventoryNotFoundException("Inventario no encontrado para el ingrediente id: " + request.getIngredientId()));
 
             applyStockChange(inventory, request);
 
             inventoryRepository.flush();
 
             InventoryMovement movement = InventoryMovement.builder()
-                    .product(product)
+                    .ingredient(ingredient)
                     .type(request.getType())
                     .quantity(request.getQuantity())
                     .reason(request.getReason())
@@ -85,13 +85,13 @@ public class InventoryMovementService {
 
     private void validateRequest(InventoryMovementRequest request) {
         if (request.getQuantity() == null || request.getQuantity() <= 0) {
-            throw new InvalidQuantityException("La cantidad debe ser mayor a cero para productoId: " + request.getProductId());
+            throw new InvalidQuantityException("La cantidad debe ser mayor a cero para ingredienteId: " + request.getIngredientId());
         }
         if (request.getType() == null) {
-            throw new InvalidMovementTypeException("Tipo de movimiento es obligatorio para productoId: " + request.getProductId());
+            throw new InvalidMovementTypeException("Tipo de movimiento es obligatorio para ingredienteId: " + request.getIngredientId());
         }
         if (request.getSource() == null) {
-            throw new IllegalArgumentException("El origen del movimiento es obligatorio para productoId: " + request.getProductId());
+            throw new IllegalArgumentException("El origen del movimiento es obligatorio para ingredienteId: " + request.getIngredientId());
         }
     }
 
@@ -102,15 +102,15 @@ public class InventoryMovementService {
         switch (type) {
             case IN -> inventory.increaseStock(qty);
             case OUT -> inventory.decreaseStock(qty);
-            default -> throw new InvalidMovementTypeException("Tipo de movimiento no válido para productoId: " + request.getProductId());
+            default -> throw new InvalidMovementTypeException("Tipo de movimiento no válido para ingredienteId: " + request.getIngredientId());
         }
     }
 
     private InventoryMovementResponse mapToResponse(InventoryMovement movement) {
         return InventoryMovementResponse.builder()
                 .id(movement.getId())
-                .productId(movement.getProduct().getId())
-                .productName(movement.getProduct().getName())
+                .ingredientId(movement.getIngredient().getId())
+                .ingredientName(movement.getIngredient().getName())
                 .type(movement.getType())
                 .quantity(movement.getQuantity())
                 .date(movement.getDate())

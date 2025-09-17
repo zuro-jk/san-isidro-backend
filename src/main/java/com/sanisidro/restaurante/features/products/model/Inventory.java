@@ -3,6 +3,7 @@ package com.sanisidro.restaurante.features.products.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -12,19 +13,15 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@ToString(onlyExplicitlyIncluded = true)
 public class Inventory {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "inventory_id")
     private Long id;
 
     @OneToOne(optional = false)
-    @JoinColumn(name = "product_id", nullable = false, unique = true)
-    @ToString.Include
-    private Product product;
+    @JoinColumn(name = "ingredient_id", nullable = false, unique = true)
+    private Ingredient ingredient;
 
     @Column(name = "current_stock", nullable = false)
     private Integer currentStock;

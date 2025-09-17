@@ -1,7 +1,8 @@
 package com.sanisidro.restaurante.features.products.controller;
 
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
-import com.sanisidro.restaurante.features.products.dto.inventory.request.InventoryRequest;
+import com.sanisidro.restaurante.features.products.dto.inventory.request.InventoryCreateRequest;
+import com.sanisidro.restaurante.features.products.dto.inventory.request.InventoryUpdateRequest;
 import com.sanisidro.restaurante.features.products.dto.inventory.response.InventoryResponse;
 import com.sanisidro.restaurante.features.products.service.InventoryService;
 import jakarta.validation.Valid;
@@ -31,15 +32,21 @@ public class InventoryController {
         return ResponseEntity.ok(new ApiResponse<>(true, "Inventario obtenido correctamente", inventory));
     }
 
+    @GetMapping("/ingredient/{ingredientId}")
+    public ResponseEntity<ApiResponse<InventoryResponse>> getByIngredient(@PathVariable Long ingredientId) {
+        InventoryResponse inventory = inventoryService.getByIngredient(ingredientId);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Inventario por ingrediente obtenido correctamente", inventory));
+    }
+
     @PostMapping
-    public ResponseEntity<ApiResponse<InventoryResponse>> create(@Valid @RequestBody InventoryRequest request) {
+    public ResponseEntity<ApiResponse<InventoryResponse>> create(@Valid @RequestBody InventoryCreateRequest request) {
         InventoryResponse created = inventoryService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ApiResponse<>(true, "Inventario creado correctamente", created));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<InventoryResponse>> update(@PathVariable Long id, @Valid @RequestBody InventoryRequest request) {
+    public ResponseEntity<ApiResponse<InventoryResponse>> update(@PathVariable Long id, @Valid @RequestBody InventoryUpdateRequest request) {
         InventoryResponse updated = inventoryService.update(id, request);
         return ResponseEntity.ok(new ApiResponse<>(true, "Inventario actualizado correctamente", updated));
     }
@@ -47,8 +54,7 @@ public class InventoryController {
     @PatchMapping("/{id}")
     public ResponseEntity<ApiResponse<InventoryResponse>> partialUpdate(
             @PathVariable Long id,
-            @RequestBody InventoryRequest request) {
-
+            @RequestBody InventoryCreateRequest request) {
         InventoryResponse updated = inventoryService.partialUpdate(id, request);
         return ResponseEntity.ok(new ApiResponse<>(true, "Inventario actualizado parcialmente", updated));
     }

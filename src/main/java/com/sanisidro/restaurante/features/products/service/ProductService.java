@@ -1,20 +1,28 @@
 package com.sanisidro.restaurante.features.products.service;
 
-import com.sanisidro.restaurante.core.security.dto.ApiResponse;
 import com.sanisidro.restaurante.features.products.dto.product.request.ProductRequest;
+import com.sanisidro.restaurante.features.products.dto.product.response.ProductDetailResponse;
 import com.sanisidro.restaurante.features.products.dto.product.response.ProductResponse;
+import com.sanisidro.restaurante.features.products.dto.productingredient.response.ProductIngredientResponse;
 import com.sanisidro.restaurante.features.products.exceptions.CategoryNotFoundException;
 import com.sanisidro.restaurante.features.products.exceptions.ProductNotFoundException;
 import com.sanisidro.restaurante.features.products.model.Category;
+import com.sanisidro.restaurante.features.products.model.Ingredient;
 import com.sanisidro.restaurante.features.products.model.Product;
+import com.sanisidro.restaurante.features.products.model.ProductIngredient;
 import com.sanisidro.restaurante.features.products.repository.CategoryRepository;
+import com.sanisidro.restaurante.features.products.repository.IngredientRepository;
+import com.sanisidro.restaurante.features.products.repository.ProductIngredientRepository;
 import com.sanisidro.restaurante.features.products.repository.ProductRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -22,31 +30,32 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final IngredientRepository ingredientRepository;
+    private final ProductIngredientRepository productIngredientRepository;
 
     public List<ProductResponse> getAll() {
-        List<ProductResponse> products = productRepository.findAll().stream()
+        return productRepository.findAll().stream()
                 .map(this::mapToResponse)
                 .toList();
-        return products;
     }
 
     public List<ProductResponse> getByCategory(Long categoryId) {
         categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new CategoryNotFoundException("Categoría no encontrada con id: " + categoryId));
 
-        List<ProductResponse> products = productRepository.findByCategoryId(categoryId).stream()
+        return productRepository.findByCategoryId(categoryId).stream()
                 .map(this::mapToResponse)
                 .toList();
-        return products;
     }
 
-    public ProductResponse getById(Long id) {
+    public ProductDetailResponse getById(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException("Producto no encontrado con id: " + id));
-        return mapToResponse(product);
+        return mapToDetailResponse(product);
     }
 
-    public ProductResponse create(ProductRequest request) {
+    @Transactional
+    public ProductDetailResponse create(ProductRequest request) {
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new CategoryNotFoundException("Categoría no encontrada con id: " + request.getCategoryId()));
 
@@ -57,11 +66,29 @@ public class ProductService {
                 .imageUrl(request.getImageUrl())
                 .build();
 
-        Product savedProduct = productRepository.save(product);
-        return mapToResponse(savedProduct);
+        if (request.getIngredients() != null && !request.getIngredients().isEmpty()) {
+            Set<ProductIngredient> ingredients = request.getIngredients().stream()
+                    .map(ingReq -> {
+                        Ingredient ingredient = ingredientRepository.findById(ingReq.getIngredientId())
+                                .orElseThrow(() -> new EntityNotFoundException("Ingrediente no encontrado con id: " + ingReq.getIngredientId()));
+
+                        return ProductIngredient.builder()
+                                .product(product)
+                                .ingredient(ingredient)
+                                .quantity(ingReq.getQuantity())
+                                .build();
+                    })
+                    .collect(Collectors.toSet());
+
+            product.replaceIngredients(ingredients);
+        }
+
+        Product saved = productRepository.save(product);
+        return mapToDetailResponse(saved);
     }
 
-    public ProductResponse update(Long id, ProductRequest request) {
+    @Transactional
+    public ProductDetailResponse update(Long id, ProductRequest request) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException("Producto no encontrado con id: " + id));
 
@@ -80,16 +107,33 @@ public class ProductService {
             product.setImageUrl(request.getImageUrl());
         }
 
-        Product updatedProduct = productRepository.save(product);
-        return mapToResponse(updatedProduct);
+        if (request.getIngredients() != null) {
+            Set<ProductIngredient> ingredients = request.getIngredients().stream()
+                    .map(ingReq -> {
+                        Ingredient ingredient = ingredientRepository.findById(ingReq.getIngredientId())
+                                .orElseThrow(() -> new EntityNotFoundException("Ingrediente no encontrado con id: " + ingReq.getIngredientId()));
+
+                        return ProductIngredient.builder()
+                                .product(product)
+                                .ingredient(ingredient)
+                                .quantity(ingReq.getQuantity())
+                                .build();
+                    })
+                    .collect(Collectors.toSet());
+
+            product.replaceIngredients(ingredients);
+        }
+
+        Product updated = productRepository.save(product);
+        return mapToDetailResponse(updated);
     }
 
-    public Void delete(Long id) {
+    @Transactional
+    public void delete(Long id) {
         if (!productRepository.existsById(id)) {
             throw new ProductNotFoundException("Producto no encontrado con id: " + id);
         }
         productRepository.deleteById(id);
-        return null;
     }
 
     private ProductResponse mapToResponse(Product product) {
@@ -100,6 +144,31 @@ public class ProductService {
                 .categoryId(product.getCategory().getId())
                 .categoryName(product.getCategory().getName())
                 .imageUrl(product.getImageUrl())
+                .build();
+    }
+
+    private ProductDetailResponse mapToDetailResponse(Product product) {
+        List<ProductIngredientResponse> ingredientResponses = product.getIngredients() == null
+                ? List.of()
+                : product.getIngredients().stream()
+                .map(pi -> ProductIngredientResponse.builder()
+                        .ingredientId(pi.getIngredient().getId())
+                        .ingredientName(pi.getIngredient().getName())
+                        .unitName(pi.getIngredient().getUnit().getName())
+                        .unitSymbol(pi.getIngredient().getUnit().getSymbol())
+                        .quantity(pi.getQuantity())
+                        .build()
+                )
+                .toList();
+
+        return ProductDetailResponse.builder()
+                .id(product.getId())
+                .name(product.getName())
+                .price(product.getPrice())
+                .categoryId(product.getCategory().getId())
+                .categoryName(product.getCategory().getName())
+                .imageUrl(product.getImageUrl())
+                .ingredients(ingredientResponses)
                 .build();
     }
 }
