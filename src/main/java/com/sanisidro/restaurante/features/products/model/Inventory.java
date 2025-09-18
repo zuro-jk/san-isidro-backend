@@ -40,6 +40,12 @@ public class Inventory {
     @Version
     private Long version;
 
+    /**
+     * Evita spam de alertas: se guarda la fecha en que se envió la última notificación
+     */
+    @Column
+    private LocalDateTime alertSentAt;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -52,7 +58,8 @@ public class Inventory {
     }
 
     public void increaseStock(BigDecimal qty) {
-        if (qty.compareTo(BigDecimal.ZERO) < 0) throw new InvalidQuantityException("Cantidad debe ser positiva");
+        if (qty.compareTo(BigDecimal.ZERO) < 0)
+            throw new InvalidQuantityException("Cantidad debe ser positiva");
         this.currentStock = this.currentStock.add(qty);
     }
 
@@ -67,4 +74,15 @@ public class Inventory {
 
         this.currentStock = this.currentStock.subtract(qty);
     }
+
+    public boolean shouldNotifyLowStock() {
+        if (currentStock.compareTo(minimumStock) >= 0) return false;
+        if (alertSentAt == null) return true;
+        return alertSentAt.plusHours(24).isBefore(LocalDateTime.now());
+    }
+
+    public void markAlertSent() {
+        this.alertSentAt = LocalDateTime.now();
+    }
+
 }

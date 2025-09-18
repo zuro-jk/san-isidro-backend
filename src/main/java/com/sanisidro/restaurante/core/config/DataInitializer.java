@@ -7,7 +7,7 @@ import com.sanisidro.restaurante.core.security.repository.UserRepository;
 import com.sanisidro.restaurante.features.customers.enums.LoyaltyRuleType;
 import com.sanisidro.restaurante.features.customers.model.LoyaltyRule;
 import com.sanisidro.restaurante.features.customers.repository.LoyaltyRuleRepository;
-import com.sanisidro.restaurante.features.orders.enums.MovementSource;
+import com.sanisidro.restaurante.features.products.enums.MovementSource;
 import com.sanisidro.restaurante.features.orders.model.OrderStatus;
 import com.sanisidro.restaurante.features.orders.model.OrderStatusTranslation;
 import com.sanisidro.restaurante.features.orders.model.OrderType;
@@ -692,11 +692,16 @@ public class DataInitializer implements CommandLineRunner {
         List<Ingredient> ingredients = ingredientRepository.findAll();
 
         List<Inventory> inventories = ingredients.stream()
-                .map(ing -> Inventory.builder()
-                        .ingredient(ing)
-                        .currentStock(BigDecimal.valueOf(0.0))
-                        .minimumStock(getDefaultMinStock(ing.getName()))
-                        .build())
+                .map(ing -> {
+                    BigDecimal minStock = getDefaultMinStock(ing.getName());
+                    BigDecimal initialStock = minStock.multiply(BigDecimal.valueOf(2));
+
+                    return Inventory.builder()
+                            .ingredient(ing)
+                            .currentStock(initialStock)
+                            .minimumStock(minStock)
+                            .build();
+                })
                 .toList();
 
         inventoryRepository.saveAll(inventories);
@@ -710,7 +715,7 @@ public class DataInitializer implements CommandLineRunner {
             case "Arroz" -> BigDecimal.valueOf(3000.0);
             case "Pan" -> BigDecimal.valueOf(20.0);
             case "Queso" -> BigDecimal.valueOf(500.0);
-            default -> BigDecimal.valueOf(0.0);
+            default -> BigDecimal.valueOf(100.0); // Para otros ingredientes, stock mínimo pequeño
         };
     }
 
@@ -729,7 +734,7 @@ public class DataInitializer implements CommandLineRunner {
         List<InventoryMovement> movements = List.of(
                 InventoryMovement.builder()
                         .ingredient(pollo)
-                        .type(MovementType.IN)
+                        .type(MovementType.ENTRY)
                         .quantity(BigDecimal.valueOf(2000))
                         .reason("Compra inicial de pollo")
                         .source(MovementSource.PURCHASE)
@@ -737,7 +742,7 @@ public class DataInitializer implements CommandLineRunner {
                         .build(),
                 InventoryMovement.builder()
                         .ingredient(papa)
-                        .type(MovementType.OUT)
+                        .type(MovementType.EXIT)
                         .quantity(BigDecimal.valueOf(500))
                         .reason("Consumo en pruebas de cocina")
                         .source(MovementSource.MANUAL)

@@ -81,6 +81,7 @@ spring:
       timeout: 60000
 
 app:
+  tax: 0.18
   jwt:
     secret: ${JWT_SECRET:N8sH0LkP7C9y4q1F2B3X6vTj8dW+zR5YhK0pUgQeMnAoIsJcZxVbTfLrGw==}
     access-token-expiration: 3600000       # 1 hora

@@ -1,6 +1,6 @@
 package com.sanisidro.restaurante.features.products.dto.inventorymovement.request;
 
-import com.sanisidro.restaurante.features.orders.enums.MovementSource;
+import com.sanisidro.restaurante.features.products.enums.MovementSource;
 import com.sanisidro.restaurante.features.products.enums.MovementType;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;

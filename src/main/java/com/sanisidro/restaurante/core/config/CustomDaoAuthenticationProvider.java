@@ -19,7 +19,6 @@ public class CustomDaoAuthenticationProvider extends DaoAuthenticationProvider {
             }
         }
 
-        // Llamar al método original para usuarios normales
         super.additionalAuthenticationChecks(userDetails, authentication);
     }
 }

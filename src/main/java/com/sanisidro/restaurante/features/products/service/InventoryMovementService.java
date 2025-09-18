@@ -101,8 +101,8 @@ public class InventoryMovementService {
         MovementType type = request.getType();
 
         switch (type) {
-            case IN -> inventory.increaseStock(qty);
-            case OUT -> inventory.decreaseStock(qty);
+            case ENTRY -> inventory.increaseStock(qty);
+            case EXIT -> inventory.decreaseStock(qty);
             default -> throw new InvalidMovementTypeException("Tipo de movimiento no válido para ingredienteId: " + request.getIngredientId());
         }
     }

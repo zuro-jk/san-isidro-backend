@@ -1,6 +1,6 @@
 package com.sanisidro.restaurante.features.products.model;
 
-import com.sanisidro.restaurante.features.orders.enums.MovementSource;
+import com.sanisidro.restaurante.features.products.enums.MovementSource;
 import com.sanisidro.restaurante.features.products.enums.MovementType;
 import jakarta.persistence.*;
 import lombok.*;
