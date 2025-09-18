@@ -7,6 +7,11 @@ import com.sanisidro.restaurante.core.security.repository.UserRepository;
 import com.sanisidro.restaurante.features.customers.enums.LoyaltyRuleType;
 import com.sanisidro.restaurante.features.customers.model.LoyaltyRule;
 import com.sanisidro.restaurante.features.customers.repository.LoyaltyRuleRepository;
+import com.sanisidro.restaurante.features.employees.enums.EmploymentStatus;
+import com.sanisidro.restaurante.features.employees.model.Employee;
+import com.sanisidro.restaurante.features.employees.model.Position;
+import com.sanisidro.restaurante.features.employees.repository.EmployeeRepository;
+import com.sanisidro.restaurante.features.employees.repository.PositionRepository;
 import com.sanisidro.restaurante.features.products.enums.MovementSource;
 import com.sanisidro.restaurante.features.orders.model.OrderStatus;
 import com.sanisidro.restaurante.features.orders.model.OrderStatusTranslation;
@@ -24,7 +29,6 @@ import com.sanisidro.restaurante.features.suppliers.enums.PurchaseOrderStatus;
 import com.sanisidro.restaurante.features.suppliers.model.PurchaseOrder;
 import com.sanisidro.restaurante.features.suppliers.model.PurchaseOrderDetail;
 import com.sanisidro.restaurante.features.suppliers.model.Supplier;
-import com.sanisidro.restaurante.features.suppliers.repository.PurchaseOrderDetailRepository;
 import com.sanisidro.restaurante.features.suppliers.repository.PurchaseOrderRepository;
 import com.sanisidro.restaurante.features.suppliers.repository.SupplierRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +39,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Collections;
 import java.util.List;
@@ -63,7 +68,8 @@ public class DataInitializer implements CommandLineRunner {
     private final InventoryMovementRepository inventoryMovementRepository;
     private final SupplierRepository supplierRepository;
     private final PurchaseOrderRepository purchaseOrderRepository;
-    private final PurchaseOrderDetailRepository purchaseOrderDetailRepository;
+    private final EmployeeRepository employeeRepository;
+    private final PositionRepository positionRepository;
 
 
     @Override
@@ -83,6 +89,7 @@ public class DataInitializer implements CommandLineRunner {
         initSupplierUsers();
         initSuppliers();
         initPurchaseOrders();
+        initEmployees();
     }
 
     private void initRoles() {
@@ -875,4 +882,89 @@ public class DataInitializer implements CommandLineRunner {
         log.info(">>> Órdenes de compra inicializadas correctamente");
     }
 
+    private void initEmployees() {
+        if (employeeRepository.count() > 0) {
+            log.info(">>> Empleados ya inicializados");
+            return;
+        }
+
+        log.info(">>> Inicializando posiciones, usuarios y empleados...");
+
+        // Crear posiciones
+        Position adminPosition = Position.builder()
+                .name("ADMIN")
+                .description("Administrador del sistema")
+                .roles(Set.of(roleRepository.findByName("ROLE_ADMIN").orElseThrow()))
+                .build();
+
+        Position waiterPosition = Position.builder()
+                .name("WAITER")
+                .description("Mesero del restaurante")
+                .roles(Set.of(roleRepository.findByName("ROLE_WAITER").orElseThrow()))
+                .build();
+
+        Position chefPosition = Position.builder()
+                .name("CHEF")
+                .description("Chef encargado de cocina")
+                .roles(Set.of(roleRepository.findByName("ROLE_CHEF").orElseThrow()))
+                .build();
+
+        positionRepository.saveAll(List.of(adminPosition, waiterPosition, chefPosition));
+
+        User adminUser = userRepository.findByUsername("admin")
+                .orElseThrow(() -> new IllegalStateException("El usuario admin debería existir"));
+        adminUser.syncRolesWithPosition(adminPosition);
+
+        User waiterUser = User.builder()
+                .username("maria_w")
+                .email("maria.waiter@restaurante.com")
+                .firstName("Maria")
+                .lastName("Perez")
+                .password(passwordEncoder.encode("password123"))
+                .enabled(true)
+                .build();
+
+        waiterUser.syncRolesWithPosition(waiterPosition);
+
+        User chefUser = User.builder()
+                .username("carlos_c")
+                .email("carlos.chef@restaurante.com")
+                .firstName("Carlos")
+                .lastName("Ramirez")
+                .password(passwordEncoder.encode("password123"))
+                .enabled(true)
+                .build();
+
+        chefUser.syncRolesWithPosition(chefPosition);
+
+        userRepository.saveAll(List.of(waiterUser, chefUser));
+
+        Employee adminEmployee = Employee.builder()
+                .user(adminUser)
+                .position(adminPosition)
+                .salary(BigDecimal.valueOf(5000))
+                .hireDate(LocalDate.now())
+                .status(EmploymentStatus.ACTIVE)
+                .build();
+
+        Employee waiterEmployee = Employee.builder()
+                .user(waiterUser)
+                .position(waiterPosition)
+                .salary(BigDecimal.valueOf(2000))
+                .hireDate(LocalDate.now())
+                .status(EmploymentStatus.ACTIVE)
+                .build();
+
+        Employee chefEmployee = Employee.builder()
+                .user(chefUser)
+                .position(chefPosition)
+                .salary(BigDecimal.valueOf(3000))
+                .hireDate(LocalDate.now())
+                .status(EmploymentStatus.ACTIVE)
+                .build();
+
+        employeeRepository.saveAll(List.of(adminEmployee, waiterEmployee, chefEmployee));
+
+        log.info(">>> Empleados inicializados correctamente con usuarios y posiciones");
+    }
 }

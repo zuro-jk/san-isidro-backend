@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.core.security.model;
 
+import com.sanisidro.restaurante.features.employees.model.Position;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
@@ -104,5 +105,14 @@ public class User implements UserDetails {
 
     public String getFullName() {
         return firstName + " " + lastName;
+    }
+
+    public void syncRolesWithPosition(Position position) {
+        Set<Role> extraRoles = new HashSet<>(this.roles);
+        extraRoles.removeAll(position.getRoles());
+
+        this.roles.clear();
+        this.roles.addAll(position.getRoles());
+        this.roles.addAll(extraRoles);
     }
 }
