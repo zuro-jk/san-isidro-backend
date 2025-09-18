@@ -15,7 +15,7 @@ public class AddressRequest {
     @NotNull(message = "El cliente es obligatorio")
     private Long customerId;
 
-    @NotBlank(message = "Address is required")
+    @NotBlank(message = "La dirección es obligatoria")
     @Size(min = 5, max = 255, message = "La dirección debe tener entre 5 y 255 caracteres")
     private String address;
 

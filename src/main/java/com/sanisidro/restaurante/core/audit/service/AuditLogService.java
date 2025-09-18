@@ -13,12 +13,11 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class AuditLogService {
 
-
     private final AuditLogRepository auditLogRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     public void log(String entityName, Long entityId, String action,
-                    Object oldValue, Object newValue, String username) {
+                    Object oldValue, Object newValue, Long userId, String username) {
         try {
             AuditLog log = AuditLog.builder()
                     .entityName(entityName)
@@ -26,6 +25,7 @@ public class AuditLogService {
                     .action(action)
                     .oldValue(oldValue != null ? objectMapper.writeValueAsString(oldValue) : null)
                     .newValue(newValue != null ? objectMapper.writeValueAsString(newValue) : null)
+                    .userId(userId)
                     .username(username)
                     .timestamp(LocalDateTime.now())
                     .build();

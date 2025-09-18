@@ -1,4 +1,12 @@
+logging:
+  level:
+    org.springframework.security: TRACE
+
 spring:
+
+  profiles:
+    active: dev
+
   config:
     import: optional:file:.env.properties[.properties]
 
@@ -13,7 +21,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create-drop
     show-sql: true
     properties:
       hibernate:
@@ -44,8 +52,49 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 15MB
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope: openid, profile, email
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+            token-uri: https://oauth2.googleapis.com/token
+            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+            user-name-attribute: sub
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 60000
+
 app:
+  tax: 0.18
   jwt:
     secret: ${JWT_SECRET:N8sH0LkP7C9y4q1F2B3X6vTj8dW+zR5YhK0pUgQeMnAoIsJcZxVbTfLrGw==}
     access-token-expiration: 3600000       # 1 hora
     refresh-token-expiration: 1209600000   # 14 dias
+
+  file:
+    allowed-extensions: [".jpg", ".jpeg", ".png", ".pdf", ".mp4", ".mp3"]
+    allowed-folders: ["products", "profiles", "general"]
+    max-size: 15MB
+
+aws:
+  s3:
+    bucket-name: ${AWS_S3_BUCKET_NAME}
+    region: ${AWS_REGION:us-east-1}
+    access-key: ${AWS_ACCESS_KEY_ID}
+    secret-key: ${AWS_SECRET_ACCESS_KEY}

@@ -8,5 +8,6 @@ import java.util.List;
 
 @Repository
 public interface InventoryMovementRepository extends JpaRepository<InventoryMovement, Long> {
-    List<InventoryMovement> findByProductId(Long productId);
+
+    List<InventoryMovement> findByIngredientId(Long ingredientId);
 }

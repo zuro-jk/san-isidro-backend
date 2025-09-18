@@ -9,8 +9,8 @@ import java.math.BigDecimal;
 @Data
 public class PurchaseOrderDetailCreateRequest {
 
-    @NotNull(message = "El producto es obligatorio")
-    private Long productId;
+    @NotNull(message = "El ingrediente es obligatorio")
+    private Long ingredientId;
 
     @NotNull(message = "La cantidad es obligatoria")
     @Positive(message = "La cantidad debe ser mayor a 0")

@@ -21,10 +21,16 @@ public class AuditLog {
     private String entityName;
     private Long entityId;
     private String action;
+
+    @Column(columnDefinition = "TEXT")
     private String oldValue;
+
+    @Column(columnDefinition = "TEXT")
     private String newValue;
 
+    private Long userId;
     private String username;
+
     private LocalDateTime timestamp;
 
 }

@@ -1,6 +1,7 @@
 package com.sanisidro.restaurante.core.security.jwt;
 
 import com.sanisidro.restaurante.core.security.service.CustomUserDetailsService;
+import com.sanisidro.restaurante.core.security.service.TokenBlacklistService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,6 +23,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final CustomUserDetailsService userDetailsService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -29,7 +31,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         return path.startsWith("/api/v1/auth/")
                 || path.startsWith("/actuator")
                 || path.startsWith("/v3/api-docs")
-                || path.startsWith("/swagger");
+                || path.startsWith("/swagger")
+                || path.startsWith("/oauth2/");
     }
 
     @Override
@@ -37,14 +40,30 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     @NonNull HttpServletResponse response,
                                     @NonNull FilterChain chain) throws ServletException, IOException {
 
-        String header = request.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) {
+        String token = null;
+        if (request.getCookies() != null) {
+            for (var cookie : request.getCookies()) {
+                if ("accessToken".equals(cookie.getName())) {
+                    token = cookie.getValue();
+                    break;
+                }
+            }
+        }
+
+        if (token == null || token.isEmpty()) {
+            String header = request.getHeader("Authorization");
+            if (header != null && header.startsWith("Bearer ")) {
+                token = header.substring(7).trim();
+            }
+        }
+
+        if (token == null || token.isEmpty()) {
             chain.doFilter(request, response);
             return;
         }
-        String token = header.substring(7).trim();
-        if (token.isEmpty()) {
-            chain.doFilter(request, response);
+
+        if (tokenBlacklistService.isBlacklisted(token)) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return;
         }
 

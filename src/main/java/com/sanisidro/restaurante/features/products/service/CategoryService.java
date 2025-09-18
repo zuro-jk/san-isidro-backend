@@ -1,7 +1,9 @@
 package com.sanisidro.restaurante.features.products.service;
 
+import com.sanisidro.restaurante.core.security.dto.ApiResponse;
 import com.sanisidro.restaurante.features.products.dto.category.request.CategoryRequest;
 import com.sanisidro.restaurante.features.products.dto.category.response.CategoryResponse;
+import com.sanisidro.restaurante.features.products.exceptions.CategoryNotFoundException;
 import com.sanisidro.restaurante.features.products.model.Category;
 import com.sanisidro.restaurante.features.products.repository.CategoryRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -17,14 +19,15 @@ public class CategoryService {
     private final CategoryRepository categoryRepository;
 
     public List<CategoryResponse> getAll() {
-        return categoryRepository.findAll().stream()
+        List<CategoryResponse> categories = categoryRepository.findAll().stream()
                 .map(this::mapToResponse)
                 .toList();
+        return categories;
     }
 
     public CategoryResponse getById(Long id) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Categoría no encontrada con id: " + id));
+                .orElseThrow(() -> new CategoryNotFoundException("Categoría no encontrada con id: " + id));
         return mapToResponse(category);
     }
 
@@ -32,21 +35,24 @@ public class CategoryService {
         Category category = Category.builder()
                 .name(request.getName())
                 .build();
-        return mapToResponse(categoryRepository.save(category));
+        Category savedCategory = categoryRepository.save(category);
+        return mapToResponse(savedCategory);
     }
 
     public CategoryResponse update(Long id, CategoryRequest request) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Categoría no encontrada con id: " + id));
+                .orElseThrow(() -> new CategoryNotFoundException("Categoría no encontrada con id: " + id));
         category.setName(request.getName());
-        return mapToResponse(categoryRepository.save(category));
+        Category updatedCategory = categoryRepository.save(category);
+        return  mapToResponse(updatedCategory);
     }
 
-    public void delete(Long id) {
+    public Void delete(Long id) {
         if (!categoryRepository.existsById(id)) {
-            throw new EntityNotFoundException("Categoría no encontrada con id: " + id);
+            throw new CategoryNotFoundException("Categoría no encontrada con id: " + id);
         }
         categoryRepository.deleteById(id);
+        return null;
     }
 
     private CategoryResponse mapToResponse(Category category) {

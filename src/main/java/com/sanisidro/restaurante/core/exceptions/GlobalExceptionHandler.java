@@ -1,10 +1,19 @@
 package com.sanisidro.restaurante.core.exceptions;
 
+import com.sanisidro.restaurante.core.aws.exception.AccessDeniedException;
+import com.sanisidro.restaurante.core.aws.exception.FileNotFoundException;
+import com.sanisidro.restaurante.core.aws.exception.FileUploadException;
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
+import com.sanisidro.restaurante.features.products.exceptions.*;
+import com.sanisidro.restaurante.features.suppliers.exceptions.SupplierNotFoundException;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.OptimisticLockException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -21,27 +30,55 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(false, message, null));
     }
 
+    @ExceptionHandler(OAuth2AuthenticationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleOAuth2Exception(OAuth2AuthenticationException ex) {
+        ex.printStackTrace(); // log completo en consola
+        OAuth2Error error = ex.getError();
+        String errorDescription = error.getDescription() != null ? error.getDescription() : error.getErrorCode();
+        String message = "OAuth2 Authentication failed: " + errorDescription;
+        return buildResponse(message, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(FileNotFoundException.class)
+    public ResponseEntity<ApiResponse<Object>> handleFileNotFound(FileNotFoundException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(FileUploadException.class)
+    public ResponseEntity<ApiResponse<Object>> handleFileUpload(FileUploadException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleFileAccessDenied(AccessDeniedException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.FORBIDDEN);
+    }
+
     @ExceptionHandler({
-            UserNotFoundException.class,
-            ResourceNotFoundException.class,
-            EntityNotFoundException.class
+            ProductNotFoundException.class,
+            CategoryNotFoundException.class,
+            InventoryNotFoundException.class,
+            SupplierNotFoundException.class,
+            EntityNotFoundException.class,
     })
     public ResponseEntity<ApiResponse<Object>> handleNotFound(RuntimeException ex) {
         return buildResponse(ex.getMessage(), HttpStatus.NOT_FOUND);
     }
 
-    @ExceptionHandler({
-            UsernameAlreadyExistsException.class,
-            EmailAlreadyExistsException.class,
-            DuplicateReservationException.class
-    })
-    public ResponseEntity<ApiResponse<Object>> handleConflict(RuntimeException ex) {
+    @ExceptionHandler(DuplicateProductException.class)
+    public ResponseEntity<ApiResponse<Object>> handleDuplicateProduct(DuplicateProductException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiResponse<Object>> handleConflict(ConflictException ex) {
         return buildResponse(ex.getMessage(), HttpStatus.CONFLICT);
     }
 
     @ExceptionHandler({
             InvalidReservationException.class,
-            BadRequestException.class
+            BadRequestException.class,
+            InvalidPointsOperationException.class
     })
     public ResponseEntity<ApiResponse<Object>> handleBadRequest(RuntimeException ex) {
         return buildResponse(ex.getMessage(), HttpStatus.BAD_REQUEST);
@@ -88,7 +125,33 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGenericException(Exception ex) {
+        ex.printStackTrace();
         return buildResponse("Ocurrió un error inesperado", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(InventoryAlreadyExistsException.class)
+    public ResponseEntity<ApiResponse<Object>> handleInventoryAlreadyExists(InventoryAlreadyExistsException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler({
+            InvalidQuantityException.class,
+            InvalidMovementTypeException.class,
+            InsufficientStockException.class
+    })
+    public ResponseEntity<ApiResponse<Object>> handleInventoryValidation(RuntimeException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler({
+            OptimisticLockException.class,
+            OptimisticLockingFailureException.class
+    })
+    public ResponseEntity<ApiResponse<Object>> handleOptimisticLock(RuntimeException ex) {
+        return buildResponse(
+                "Conflicto de concurrencia: otro proceso modificó el recurso. Intente nuevamente.",
+                HttpStatus.CONFLICT
+        );
     }
 
 }

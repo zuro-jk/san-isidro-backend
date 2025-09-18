@@ -1,8 +1,11 @@
 package com.sanisidro.restaurante.features.products.model;
 
+import com.sanisidro.restaurante.features.products.enums.MovementSource;
+import com.sanisidro.restaurante.features.products.enums.MovementType;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -16,23 +19,39 @@ public class InventoryMovement {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "inventory_movement_id")
     private Long id;
 
     @ManyToOne(optional = false)
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+    @JoinColumn(name = "ingredient_id", nullable = false)
+    private Ingredient ingredient;
 
-    @Column(name = "type", length = 50, nullable = false)
-    private String type;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private MovementType type;
 
-    @Column(name = "quantity", nullable = false)
-    private Integer quantity;
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal quantity;
 
-    @Column(name = "date", nullable = false)
+    @Column(nullable = false)
     private LocalDateTime date;
 
     @Column(name = "reason", columnDefinition = "text")
     private String reason;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private MovementSource source;
+
+    @Column(name = "reference_id")
+    private Long referenceId;
+
+    @Column(updatable = false, nullable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        if (date == null) date = now;
+        createdAt = now;
+    }
 }

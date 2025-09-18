@@ -8,10 +8,9 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class CustomerResponse {
-
     private Long id;
-
     private Long userId;
-
+    private String fullName;
+    private String email;
     private Integer points;
 }

@@ -7,7 +7,9 @@ import lombok.Data;
 @Builder
 public class SupplierResponse {
     private Long id;
-    private String name;
-    private String contact;
+    private String companyName;
+    private String contactName;
+    private String phone;
     private String address;
+    private Long userId;
 }

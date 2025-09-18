@@ -1,33 +1,29 @@
 package com.sanisidro.restaurante.features.customers.dto.review.request;
 
+import com.sanisidro.restaurante.features.customers.validation.review.OneReviewPerResource;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
-import java.time.LocalDateTime;
-
-@Getter
-@Setter
-@NoArgsConstructor
+@Data
 @AllArgsConstructor
+@NoArgsConstructor
 @Builder
+@OneReviewPerResource
 public class ReviewRequest {
+    private Long id;
 
-    @NotNull(message = "Orden es obligatorio")
-    private Long orderId;
-
-    @NotNull(message = "Cliente es obligatorio")
+    @NotNull(message = "El ID del cliente es obligatorio")
     private Long customerId;
 
-    @NotBlank(message = "Comentario es obligatorio")
-    @Size(max = 500, message = "Comentario no debe exceder los 500 caracteres")
+    private Long orderId;
+    private Long reservationId;
+    private Long productId;
+
     private String comment;
 
-    @NotNull(message = "Calificación es obligatoria")
-    @Min(value = 1, message = "Calificación mínima es 1")
-    @Max(value = 5, message = "Calificación máxima es 5")
+    @NotNull(message = "La calificación es obligatoria")
+    @Min(value = 1, message = "La calificación mínima es 1")
+    @Max(value = 5, message = "La calificación máxima es 5")
     private Integer rating;
-
-    @NotNull(message = "Fecha es obligatoria")
-    private LocalDateTime date;
 
 }

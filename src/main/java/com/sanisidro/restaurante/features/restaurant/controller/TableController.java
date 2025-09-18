@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.features.restaurant.controller;
 
+import com.sanisidro.restaurante.core.security.dto.ApiResponse;
 import com.sanisidro.restaurante.features.restaurant.dto.table.request.TableRequest;
 import com.sanisidro.restaurante.features.restaurant.dto.table.response.TableResponse;
 import com.sanisidro.restaurante.features.restaurant.service.TableService;
@@ -17,29 +18,35 @@ public class TableController {
 
     private final TableService tableService;
 
+
     @GetMapping
-    public ResponseEntity<List<TableResponse>> getAllTables() {
-        return ResponseEntity.ok(tableService.getAllTables());
+    public ResponseEntity<ApiResponse<List<TableResponse>>> getAllTables() {
+        List<TableResponse> tables = tableService.getAllTables();
+        return ResponseEntity.ok(new ApiResponse<>(true, "Mesas obtenidas correctamente", tables));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<TableResponse> getTableById(@PathVariable Long id) {
-        return ResponseEntity.ok(tableService.getTableById(id));
+    public ResponseEntity<ApiResponse<TableResponse>> getTableById(@PathVariable Long id) {
+        TableResponse table = tableService.getTableById(id);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Mesa obtenida correctamente", table));
     }
 
     @PostMapping
-    public ResponseEntity<TableResponse> createTable(@RequestBody @Valid TableRequest table) {
-        return ResponseEntity.ok(tableService.createTable(table));
+    public ResponseEntity<ApiResponse<TableResponse>> createTable(@RequestBody @Valid TableRequest table) {
+        TableResponse created = tableService.createTable(table);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Mesa creada correctamente", created));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<TableResponse> updateTable(@PathVariable Long id, @RequestBody @Valid TableRequest table) {
-        return ResponseEntity.ok(tableService.updateTable(id, table));
+    public ResponseEntity<ApiResponse<TableResponse>> updateTable(@PathVariable Long id,
+                                                                  @RequestBody @Valid TableRequest table) {
+        TableResponse updated = tableService.updateTable(id, table);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Mesa actualizada correctamente", updated));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteTable(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> deleteTable(@PathVariable Long id) {
         tableService.deleteTable(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(new ApiResponse<>(true, "Mesa eliminada correctamente", null));
     }
 }

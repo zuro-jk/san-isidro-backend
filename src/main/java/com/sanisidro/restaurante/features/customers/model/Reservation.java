@@ -1,5 +1,7 @@
 package com.sanisidro.restaurante.features.customers.model;
 
+import com.sanisidro.restaurante.core.model.Auditable;
+import com.sanisidro.restaurante.features.customers.dto.reservation.request.ReservationRequest;
 import com.sanisidro.restaurante.features.customers.enums.ReservationStatus;
 import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
 import jakarta.persistence.*;
@@ -18,12 +20,8 @@ import java.time.LocalTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Reservation {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "reservation_id")
-    private Long id;
+@AttributeOverride(name = "id", column = @Column(name = "reservation_id"))
+public class Reservation extends Auditable {
 
     @ManyToOne
     @JoinColumn(name = "customer_id", nullable = false)
@@ -52,10 +50,14 @@ public class Reservation {
     @Column(name = "status", length = 50)
     private ReservationStatus status = ReservationStatus.PENDING;
 
-    @CreationTimestamp
-    @Column(updatable = false)
-    private LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    private LocalDateTime updatedAt;
+    public void updateFromDto(ReservationRequest dto, Customer customer, TableEntity table) {
+        if (dto.getContactName() != null) this.contactName = dto.getContactName().trim();
+        if (dto.getContactPhone() != null) this.contactPhone = dto.getContactPhone().trim();
+        if (dto.getReservationDate() != null) this.reservationDate = dto.getReservationDate();
+        if (dto.getReservationTime() != null) this.reservationTime = dto.getReservationTime();
+        if (dto.getNumberOfPeople() != null) this.numberOfPeople = dto.getNumberOfPeople();
+        if (dto.getStatus() != null) this.status = dto.getStatus();
+        if (customer != null) this.customer = customer;
+        if (table != null) this.table = table;
+    }
 }

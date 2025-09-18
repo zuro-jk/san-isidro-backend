@@ -1,7 +1,9 @@
 package com.sanisidro.restaurante.core.kafka.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sanisidro.restaurante.features.notifications.dto.NotificationEvent;
+import com.sanisidro.restaurante.features.notifications.dto.NotifiableEvent;
+import com.sanisidro.restaurante.features.notifications.dto.OrderNotificationEvent;
+import com.sanisidro.restaurante.features.notifications.dto.ReservationNotificationEvent;
 import com.sanisidro.restaurante.features.notifications.facade.NotificationFacade;
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -25,11 +27,22 @@ public class KafkaConsumerService {
                 record.topic(), record.key(), record.value());
 
         try {
-            NotificationEvent event = objectMapper.readValue(record.value(), NotificationEvent.class);
+            String json = record.value();
+
+            NotifiableEvent event;
+            if (json.contains("\"orderId\"")) {
+                event = objectMapper.readValue(json, OrderNotificationEvent.class);
+            } else if (json.contains("\"reservationId\"")) {
+                event = objectMapper.readValue(json, ReservationNotificationEvent.class);
+            } else {
+                logger.warn("⚠️ Tipo de evento desconocido: {}", json);
+                return;
+            }
+
             notificationFacade.processNotification(event);
+
         } catch (Exception e) {
             logger.error("❌ Error al procesar el mensaje de Kafka", e);
         }
     }
-
 }

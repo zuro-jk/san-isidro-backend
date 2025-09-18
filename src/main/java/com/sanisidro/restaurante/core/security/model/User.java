@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.core.security.model;
 
+import com.sanisidro.restaurante.features.employees.model.Position;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
@@ -35,10 +36,28 @@ public class User implements UserDetails {
     @Column(unique = true, nullable = false)
     private String email;
 
-    @Column(nullable = false)
+    @Column
     private String password;
 
     private boolean enabled = true;
+
+    @Column(nullable = false)
+    private boolean emailVerified = false;
+
+    @Column
+    private String verificationCode;
+
+    @Column(unique = true)
+    private String googleId;
+
+    @Column(unique = true)
+    private String facebookId;
+
+    @Column(unique = true)
+    private String githubId;
+
+    @Column
+    private boolean isGoogleUser = false;
 
     @Builder.Default
     @ManyToMany(fetch = FetchType.EAGER)
@@ -86,5 +105,14 @@ public class User implements UserDetails {
 
     public String getFullName() {
         return firstName + " " + lastName;
+    }
+
+    public void syncRolesWithPosition(Position position) {
+        Set<Role> extraRoles = new HashSet<>(this.roles);
+        extraRoles.removeAll(position.getRoles());
+
+        this.roles.clear();
+        this.roles.addAll(position.getRoles());
+        this.roles.addAll(extraRoles);
     }
 }

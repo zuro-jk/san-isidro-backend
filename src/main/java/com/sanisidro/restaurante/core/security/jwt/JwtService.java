@@ -29,7 +29,6 @@ public class JwtService {
     private SecretKey getSigningKey() {
         byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
         return Keys.hmacShaKeyFor(keyBytes);
-//        return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
 
     public String generateAccessToken(String username, Map<String, Object> extraClaims) {
@@ -43,8 +42,8 @@ public class JwtService {
     private String buildToken(String username, Map<String, Object> extraClaims, long expiration) {
         Instant now = Instant.now();
         return Jwts.builder()
-                .claims(extraClaims)   // antes era setClaims
-                .subject(username)     // antes era setSubject
+                .claims(extraClaims)
+                .subject(username)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusMillis(expiration)))
                 .signWith(getSigningKey())
@@ -92,5 +91,11 @@ public class JwtService {
 
     public String extractSubject(String token) {
         return extractUsername(token);
+    }
+
+    public long getExpirationMillis(String token) {
+        Date expirationDate = extractExpiration(token);
+        long now = System.currentTimeMillis();
+        return Math.max(expirationDate.getTime() - now, 0);
     }
 }

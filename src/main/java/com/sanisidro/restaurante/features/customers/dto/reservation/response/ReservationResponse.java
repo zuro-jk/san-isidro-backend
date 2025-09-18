@@ -13,20 +13,14 @@ import java.time.LocalTime;
 @Builder
 public class ReservationResponse {
     private Long id;
-
     private Long customerId;
-
+    private String customerName;
     private Long tableId;
-
+    private String tableNumber;
     private String contactName;
-
     private String contactPhone;
-
     private LocalDate reservationDate;
-
     private LocalTime reservationTime;
-
     private Integer numberOfPeople;
-
     private ReservationStatus status;
 }

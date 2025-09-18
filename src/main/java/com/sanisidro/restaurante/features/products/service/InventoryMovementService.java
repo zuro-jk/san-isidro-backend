@@ -1,19 +1,22 @@
 package com.sanisidro.restaurante.features.products.service;
 
+import com.sanisidro.restaurante.features.products.dto.inventorymovement.request.InventoryMovementBatchRequest;
 import com.sanisidro.restaurante.features.products.dto.inventorymovement.request.InventoryMovementRequest;
 import com.sanisidro.restaurante.features.products.dto.inventorymovement.response.InventoryMovementResponse;
+import com.sanisidro.restaurante.features.products.enums.MovementType;
+import com.sanisidro.restaurante.features.products.exceptions.*;
 import com.sanisidro.restaurante.features.products.model.Inventory;
 import com.sanisidro.restaurante.features.products.model.InventoryMovement;
-import com.sanisidro.restaurante.features.products.model.Product;
+import com.sanisidro.restaurante.features.products.model.Ingredient;
 import com.sanisidro.restaurante.features.products.repository.InventoryMovementRepository;
 import com.sanisidro.restaurante.features.products.repository.InventoryRepository;
-import com.sanisidro.restaurante.features.products.repository.ProductRepository;
-import jakarta.persistence.EntityNotFoundException;
+import com.sanisidro.restaurante.features.products.repository.IngredientRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -22,7 +25,7 @@ public class InventoryMovementService {
 
     private final InventoryMovementRepository movementRepository;
     private final InventoryRepository inventoryRepository;
-    private final ProductRepository productRepository;
+    private final IngredientRepository ingredientRepository;
 
     public List<InventoryMovementResponse> getAll() {
         return movementRepository.findAll()
@@ -31,8 +34,11 @@ public class InventoryMovementService {
                 .toList();
     }
 
-    public List<InventoryMovementResponse> getByProduct(Long productId) {
-        return movementRepository.findByProductId(productId)
+    public List<InventoryMovementResponse> getByIngredient(Long ingredientId) {
+        ingredientRepository.findById(ingredientId)
+                .orElseThrow(() -> new IngredientNotFoundException("Ingrediente no encontrado con id: " + ingredientId));
+
+        return movementRepository.findByIngredientId(ingredientId)
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
@@ -40,48 +46,81 @@ public class InventoryMovementService {
 
     @Transactional
     public InventoryMovementResponse create(InventoryMovementRequest request) {
-        Product product = productRepository.findById(request.getProductId())
-                .orElseThrow(() -> new EntityNotFoundException("Producto no encontrado con id: " + request.getProductId()));
+        List<InventoryMovementResponse> results = createBatch(new InventoryMovementBatchRequest(List.of(request)));
+        return results.get(0);
+    }
 
-        Inventory inventory = inventoryRepository.findByProductId(request.getProductId())
-                .orElseThrow(() -> new EntityNotFoundException("Inventario no encontrado para el producto id: " + request.getProductId()));
+    @Transactional
+    public List<InventoryMovementResponse> createBatch(InventoryMovementBatchRequest batchRequest) {
+        List<InventoryMovementResponse> responses = new ArrayList<>();
 
-        // Validar y aplicar movimiento
-        if ("ENTRADA".equalsIgnoreCase(request.getType())) {
-            inventory.setCurrentStock(inventory.getCurrentStock() + request.getQuantity());
-        } else if ("SALIDA".equalsIgnoreCase(request.getType())) {
-            if (inventory.getCurrentStock() < request.getQuantity()) {
-                throw new IllegalArgumentException("Stock insuficiente para realizar la salida");
-            }
-            inventory.setCurrentStock(inventory.getCurrentStock() - request.getQuantity());
-        } else {
-            throw new IllegalArgumentException("Tipo de movimiento inválido: " + request.getType());
+        for (InventoryMovementRequest request : batchRequest.getMovements()) {
+            validateRequest(request);
+
+            Ingredient ingredient = ingredientRepository.findById(request.getIngredientId())
+                    .orElseThrow(() -> new IngredientNotFoundException("Ingrediente no encontrado con id: " + request.getIngredientId()));
+
+            Inventory inventory = inventoryRepository.findByIngredientId(request.getIngredientId())
+                    .orElseThrow(() -> new InventoryNotFoundException("Inventario no encontrado para el ingrediente id: " + request.getIngredientId()));
+
+            applyStockChange(inventory, request);
+
+            inventoryRepository.flush();
+
+            InventoryMovement movement = InventoryMovement.builder()
+                    .ingredient(ingredient)
+                    .type(request.getType())
+                    .quantity(request.getQuantity())
+                    .reason(request.getReason())
+                    .date(request.getDate())
+                    .source(request.getSource())
+                    .referenceId(request.getReferenceId())
+                    .build();
+
+            InventoryMovement savedMovement = movementRepository.save(movement);
+            responses.add(mapToResponse(savedMovement));
         }
 
-        // Guardar inventario actualizado
-        inventoryRepository.save(inventory);
+        return responses;
+    }
 
-        // Registrar movimiento
-        InventoryMovement movement = InventoryMovement.builder()
-                .product(product)
-                .type(request.getType().toUpperCase())
-                .quantity(request.getQuantity())
-                .date(LocalDateTime.now())
-                .reason(request.getReason())
-                .build();
+    private void validateRequest(InventoryMovementRequest request) {
+        if (request.getQuantity() == null || request.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidQuantityException("La cantidad debe ser mayor a cero para ingredienteId: " + request.getIngredientId());
+        }
+        if (request.getType() == null) {
+            throw new InvalidMovementTypeException("Tipo de movimiento es obligatorio para ingredienteId: " + request.getIngredientId());
+        }
+        if (request.getSource() == null) {
+            throw new IllegalArgumentException("El origen del movimiento es obligatorio para ingredienteId: " + request.getIngredientId());
+        }
+    }
 
-        return mapToResponse(movementRepository.save(movement));
+    private void applyStockChange(Inventory inventory, InventoryMovementRequest request) {
+        BigDecimal qty = request.getQuantity();
+        MovementType type = request.getType();
+
+        switch (type) {
+            case ENTRY -> inventory.increaseStock(qty);
+            case EXIT -> inventory.decreaseStock(qty);
+            default -> throw new InvalidMovementTypeException("Tipo de movimiento no válido para ingredienteId: " + request.getIngredientId());
+        }
     }
 
     private InventoryMovementResponse mapToResponse(InventoryMovement movement) {
         return InventoryMovementResponse.builder()
                 .id(movement.getId())
-                .productId(movement.getProduct().getId())
-                .productName(movement.getProduct().getName())
+                .ingredientId(movement.getIngredient().getId())
+                .ingredientName(movement.getIngredient().getName())
+                .unitName(movement.getIngredient().getUnit().getName())
+                .unitSymbol(movement.getIngredient().getUnit().getSymbol())
                 .type(movement.getType())
                 .quantity(movement.getQuantity())
                 .date(movement.getDate())
                 .reason(movement.getReason())
+                .source(movement.getSource())
+                .referenceId(movement.getReferenceId())
+                .createdAt(movement.getCreatedAt())
                 .build();
     }
 }
