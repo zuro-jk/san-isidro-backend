@@ -1,0 +1,53 @@
+package com.sanisidro.restaurante.features.orders.dto.payment.request;
+
+import jakarta.validation.constraints.*;
+import lombok.Data;
+
+import java.math.BigDecimal;
+
+@Data
+public class OnlineCheckoutRequest {
+
+    @NotNull(message = "El ID de la orden es obligatorio")
+    private Long orderId;
+
+    @NotNull(message = "El monto es obligatorio")
+    @DecimalMin(value = "0.01", message = "El monto debe ser mayor a 0")
+    private BigDecimal amount;
+
+    @NotBlank(message = "El proveedor es obligatorio (ej: MERCADOPAGO, PAYPAL)")
+    private String provider;
+
+    @NotBlank(message = "El correo es obligatorio")
+    @Email(message = "Debe ser un correo válido")
+    private String email;
+
+    @NotBlank(message = "El nombre es obligatorio")
+    private String firstName;
+
+    @NotBlank(message = "El apellido es obligatorio")
+    private String lastName;
+
+    @NotBlank(message = "El tipo de documento es obligatorio")
+    private String docType;
+
+    @NotBlank(message = "El número de documento es obligatorio")
+    @Size(max = 20, message = "El número de documento no puede superar los 20 caracteres")
+    private String docNumber;
+
+    @NotBlank(message = "El teléfono es obligatorio")
+    private String phone;
+
+    private String areaCode = "51";
+
+    @NotBlank(message = "La calle es obligatoria")
+    private String street;
+
+    @NotBlank(message = "La ciudad es obligatoria")
+    private String city;
+
+    private String zipCode = "15001";
+
+    @NotBlank(message = "El token es obligatorio")
+    private String token;
+}

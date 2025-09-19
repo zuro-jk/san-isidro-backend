@@ -19,6 +19,7 @@ import com.sanisidro.restaurante.features.orders.dto.order.response.OrderCreated
 import com.sanisidro.restaurante.features.orders.dto.order.response.OrderResponse;
 import com.sanisidro.restaurante.features.orders.dto.orderdetail.request.OrderDetailInOrderRequest;
 import com.sanisidro.restaurante.features.orders.dto.orderdetail.response.OrderDetailInOrderResponse;
+import com.sanisidro.restaurante.features.orders.dto.payment.request.PaymentInOrderRequest;
 import com.sanisidro.restaurante.features.orders.model.Order;
 import com.sanisidro.restaurante.features.orders.model.OrderDetail;
 import com.sanisidro.restaurante.features.orders.model.OrderStatus;
@@ -180,6 +181,15 @@ public class OrderService {
         );
 
         orderRepository.delete(order);
+    }
+
+    @Transactional
+    public void addLocalPayment(Long orderId, PaymentInOrderRequest request) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new EntityNotFoundException("Orden no encontrada con id: " + orderId));
+
+        paymentService.createInOrder(order, request);
+        orderRepository.save(order);
     }
 
     private Order buildOrderBase(OrderRequest request) {

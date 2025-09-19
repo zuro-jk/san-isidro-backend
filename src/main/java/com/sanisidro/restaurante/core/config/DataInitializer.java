@@ -12,13 +12,9 @@ import com.sanisidro.restaurante.features.employees.model.Employee;
 import com.sanisidro.restaurante.features.employees.model.Position;
 import com.sanisidro.restaurante.features.employees.repository.EmployeeRepository;
 import com.sanisidro.restaurante.features.employees.repository.PositionRepository;
+import com.sanisidro.restaurante.features.orders.model.*;
+import com.sanisidro.restaurante.features.orders.repository.*;
 import com.sanisidro.restaurante.features.products.enums.MovementSource;
-import com.sanisidro.restaurante.features.orders.model.OrderStatus;
-import com.sanisidro.restaurante.features.orders.model.OrderStatusTranslation;
-import com.sanisidro.restaurante.features.orders.model.OrderType;
-import com.sanisidro.restaurante.features.orders.model.OrderTypeTranslation;
-import com.sanisidro.restaurante.features.orders.repository.OrderStatusRepository;
-import com.sanisidro.restaurante.features.orders.repository.OrderTypeRepository;
 import com.sanisidro.restaurante.features.products.enums.MovementType;
 import com.sanisidro.restaurante.features.products.model.*;
 import com.sanisidro.restaurante.features.products.repository.*;
@@ -41,6 +37,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -70,6 +67,8 @@ public class DataInitializer implements CommandLineRunner {
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final EmployeeRepository employeeRepository;
     private final PositionRepository positionRepository;
+    private final PaymentMethodRepository paymentMethodRepository;
+    private final PaymentMethodTranslationRepository paymentMethodTranslationRepository;
 
 
     @Override
@@ -90,6 +89,7 @@ public class DataInitializer implements CommandLineRunner {
         initSuppliers();
         initPurchaseOrders();
         initEmployees();
+        initPaymentMethods();
     }
 
     private void initRoles() {
@@ -967,4 +967,105 @@ public class DataInitializer implements CommandLineRunner {
 
         log.info(">>> Empleados inicializados correctamente con usuarios y posiciones");
     }
+
+    private void initPaymentMethods() {
+        if (paymentMethodRepository.count() > 0) {
+            log.info(">>> Métodos de pago ya inicializados");
+            return;
+        }
+
+        log.info(">>> Inicializando métodos de pago...");
+
+        List<PaymentMethod> methods = List.of(
+                PaymentMethod.builder().code("CASH").provider("INTERNAL").build(),
+                PaymentMethod.builder().code("CARD").provider("MERCADOPAGO").build(),
+                PaymentMethod.builder().code("YAPE").provider("INTERNAL").build(),
+                PaymentMethod.builder().code("PLIN").provider("INTERNAL").build(),
+                PaymentMethod.builder().code("TRANSFER").provider("INTERNAL").build()
+        );
+
+        paymentMethodRepository.saveAll(methods);
+
+        List<PaymentMethodTranslation> translations = new ArrayList<>();
+
+        for (PaymentMethod method : methods) {
+            switch (method.getCode()) {
+                case "CASH" -> {
+                    translations.addAll(List.of(
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("es").name("Efectivo")
+                                    .description("Pago en efectivo en el restaurante")
+                                    .build(),
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("en").name("Cash")
+                                    .description("Cash payment at the restaurant")
+                                    .build()
+                    ));
+                }
+                case "CARD" -> {
+                    translations.addAll(List.of(
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("es").name("Tarjeta")
+                                    .description("Pago con tarjeta de crédito o débito vía MercadoPago")
+                                    .build(),
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("en").name("Card")
+                                    .description("Credit or debit card payment via MercadoPago")
+                                    .build()
+                    ));
+                }
+                case "YAPE" -> {
+                    translations.addAll(List.of(
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("es").name("Yape")
+                                    .description("Pago mediante Yape")
+                                    .build(),
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("en").name("Yape")
+                                    .description("Payment via Yape")
+                                    .build()
+                    ));
+                }
+                case "PLIN" -> {
+                    translations.addAll(List.of(
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("es").name("Plin")
+                                    .description("Pago mediante Plin")
+                                    .build(),
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("en").name("Plin")
+                                    .description("Payment via Plin")
+                                    .build()
+                    ));
+                }
+                case "TRANSFER" -> {
+                    translations.addAll(List.of(
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("es").name("Transferencia Bancaria")
+                                    .description("Pago mediante transferencia bancaria")
+                                    .build(),
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("en").name("Bank Transfer")
+                                    .description("Payment via bank transfer")
+                                    .build()
+                    ));
+                }
+            }
+        }
+
+        paymentMethodTranslationRepository.saveAll(translations);
+
+        log.info(">>> Métodos de pago inicializados correctamente");
+    }
+
 }

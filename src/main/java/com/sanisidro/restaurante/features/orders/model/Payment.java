@@ -1,6 +1,7 @@
 package com.sanisidro.restaurante.features.orders.model;
 
 
+import com.sanisidro.restaurante.features.orders.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -41,4 +42,7 @@ public class Payment {
     @Column(name = "transaction_code", length = 100)
     private String transactionCode;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private PaymentStatus status;
 }
