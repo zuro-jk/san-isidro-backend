@@ -1,11 +1,14 @@
 package com.sanisidro.restaurante.core.config;
 
+import com.sanisidro.restaurante.core.security.model.PaymentProfile;
 import com.sanisidro.restaurante.core.security.model.Role;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.RoleRepository;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
 import com.sanisidro.restaurante.features.customers.enums.LoyaltyRuleType;
+import com.sanisidro.restaurante.features.customers.model.Customer;
 import com.sanisidro.restaurante.features.customers.model.LoyaltyRule;
+import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
 import com.sanisidro.restaurante.features.customers.repository.LoyaltyRuleRepository;
 import com.sanisidro.restaurante.features.employees.enums.EmploymentStatus;
 import com.sanisidro.restaurante.features.employees.model.Employee;
@@ -69,6 +72,7 @@ public class DataInitializer implements CommandLineRunner {
     private final PositionRepository positionRepository;
     private final PaymentMethodRepository paymentMethodRepository;
     private final PaymentMethodTranslationRepository paymentMethodTranslationRepository;
+    private final CustomerRepository customerRepository;
 
 
     @Override
@@ -90,6 +94,7 @@ public class DataInitializer implements CommandLineRunner {
         initPurchaseOrders();
         initEmployees();
         initPaymentMethods();
+        initTestCustomers();
     }
 
     private void initRoles() {
@@ -1066,6 +1071,94 @@ public class DataInitializer implements CommandLineRunner {
         paymentMethodTranslationRepository.saveAll(translations);
 
         log.info(">>> Métodos de pago inicializados correctamente");
+    }
+
+    private void initTestCustomers() {
+        if (userRepository.findByUsername("cliente1").isPresent()) {
+            log.info(">>> Clientes de prueba ya inicializados");
+            return;
+        }
+
+        log.info(">>> Inicializando clientes de prueba...");
+
+        Role clientRole = roleRepository.findByName("ROLE_CLIENT")
+                .orElseThrow(() -> new IllegalStateException("No se encontró ROLE_CLIENT"));
+
+        User user1 = User.builder()
+                .username("cliente1")
+                .email("cliente1@test.com")
+                .firstName("Juan")
+                .lastName("Lopez")
+                .password(passwordEncoder.encode("password123"))
+                .enabled(true)
+                .roles(Set.of(clientRole))
+                .build();
+
+        PaymentProfile profile1 = PaymentProfile.builder()
+                .user(user1)
+                .docType("DNI")
+                .docNumber("12345678")
+                .phone("987654321")
+                .areaCode("51")
+                .street("Av. Principal 123")
+                .city("Lima")
+                .zipCode("15001")
+                .build();
+        user1.setPaymentProfile(profile1);
+
+        User user2 = User.builder()
+                .username("cliente2")
+                .email("cliente2@test.com")
+                .firstName("Ana")
+                .lastName("Martinez")
+                .password(passwordEncoder.encode("password123"))
+                .enabled(true)
+                .roles(Set.of(clientRole))
+                .build();
+
+        PaymentProfile profile2 = PaymentProfile.builder()
+                .user(user2)
+                .docType("DNI")
+                .docNumber("87654321")
+                .phone("987654322")
+                .areaCode("51")
+                .street("Calle Secundaria 456")
+                .city("Lima")
+                .zipCode("15002")
+                .build();
+        user2.setPaymentProfile(profile2);
+
+        User user3 = User.builder()
+                .username("cliente3")
+                .email("cliente3@test.com")
+                .firstName("Luis")
+                .lastName("Gonzalez")
+                .password(passwordEncoder.encode("password123"))
+                .enabled(true)
+                .roles(Set.of(clientRole))
+                .build();
+
+        PaymentProfile profile3 = PaymentProfile.builder()
+                .user(user3)
+                .docType("DNI")
+                .docNumber("11223344")
+                .phone("987654323")
+                .areaCode("51")
+                .street("Jr. Central 789")
+                .city("Lima")
+                .zipCode("15003")
+                .build();
+        user3.setPaymentProfile(profile3);
+
+        userRepository.saveAll(List.of(user1, user2, user3));
+
+        Customer customer1 = Customer.builder().user(user1).points(0).build();
+        Customer customer2 = Customer.builder().user(user2).points(0).build();
+        Customer customer3 = Customer.builder().user(user3).points(0).build();
+
+        customerRepository.saveAll(List.of(customer1, customer2, customer3));
+
+        log.info(">>> Clientes de prueba inicializados correctamente");
     }
 
 }

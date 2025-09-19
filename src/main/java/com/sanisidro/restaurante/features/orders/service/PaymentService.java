@@ -44,9 +44,11 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponse createOnlinePayment(OnlineCheckoutRequest request) {
+        // Obtener la orden completa
         Order order = orderRepository.findById(request.getOrderId())
                 .orElseThrow(() -> new EntityNotFoundException("Orden no encontrada con id: " + request.getOrderId()));
 
+        // Obtener el método de pago del provider
         PaymentMethod method = paymentMethodRepository.findByCodeAndProvider("CARD", request.getProvider())
                 .orElseThrow(() -> new EntityNotFoundException("Método de pago no configurado para provider: " + request.getProvider()));
 
@@ -56,7 +58,7 @@ public class PaymentService {
 
             switch (method.getProvider()) {
                 case "MERCADOPAGO" -> {
-                    MercadoPagoCheckoutRequest mpRequest = mapToMercadoPagoRequest(request);
+                    MercadoPagoCheckoutRequest mpRequest = mapToMercadoPagoRequest(order, request.getToken());
 
                     var mpPayment = mercadoPagoService.createPayment(mpRequest);
 
@@ -76,7 +78,7 @@ public class PaymentService {
             Payment payment = Payment.builder()
                     .order(order)
                     .paymentMethod(method)
-                    .amount(request.getAmount())
+                    .amount(order.getTotal())
                     .isOnline(true)
                     .transactionCode(transactionId)
                     .status(status)
@@ -142,21 +144,32 @@ public class PaymentService {
         paymentRepository.save(payment);
     }
 
-    private MercadoPagoCheckoutRequest mapToMercadoPagoRequest(OnlineCheckoutRequest request) {
+    private MercadoPagoCheckoutRequest mapToMercadoPagoRequest(Order order, String token) {
+        var customer = order.getCustomer();
+        var user = customer.getUser();
+
+        var paymentProfile = user.getPaymentProfile();
+
+        if (paymentProfile == null) {
+            throw new RuntimeException("El usuario no tiene un PaymentProfile configurado");
+        }
+
         MercadoPagoCheckoutRequest mpRequest = new MercadoPagoCheckoutRequest();
-        mpRequest.setOrderId(request.getOrderId());
-        mpRequest.setAmount(request.getAmount());
-        mpRequest.setToken(request.getToken());
-        mpRequest.setEmail(request.getEmail());
-        mpRequest.setFirstName(request.getFirstName());
-        mpRequest.setLastName(request.getLastName());
-        mpRequest.setDocType(request.getDocType());
-        mpRequest.setDocNumber(request.getDocNumber());
-        mpRequest.setPhone(request.getPhone());
-        mpRequest.setAreaCode(request.getAreaCode());
-        mpRequest.setStreet(request.getStreet());
-        mpRequest.setCity(request.getCity());
-        mpRequest.setZipCode(request.getZipCode());
+        mpRequest.setOrderId(order.getId());
+        mpRequest.setAmount(order.getTotal());
+        mpRequest.setToken(token);
+
+        mpRequest.setEmail(user.getEmail());
+        mpRequest.setFirstName(user.getFirstName());
+        mpRequest.setLastName(user.getLastName());
+        mpRequest.setDocType(paymentProfile.getDocType());
+        mpRequest.setDocNumber(paymentProfile.getDocNumber());
+        mpRequest.setPhone(paymentProfile.getPhone());
+        mpRequest.setAreaCode(paymentProfile.getAreaCode() != null ? paymentProfile.getAreaCode() : "51");
+        mpRequest.setStreet(paymentProfile.getStreet());
+        mpRequest.setCity(paymentProfile.getCity());
+        mpRequest.setZipCode(paymentProfile.getZipCode() != null ? paymentProfile.getZipCode() : "15001");
+
         return mpRequest;
     }
 
