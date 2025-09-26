@@ -18,6 +18,8 @@ import com.sanisidro.restaurante.features.notifications.templates.EmailVerificat
 import com.sanisidro.restaurante.features.notifications.templates.ReservationEmailTemplateBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -28,6 +30,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class EmailNotificationService implements NotificationChannel {
+
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
 
     private final EmailService emailService;
     private final EmailNotificationRepository emailNotificationRepository;
@@ -123,7 +128,8 @@ public class EmailNotificationService implements NotificationChannel {
             return ReservationEmailTemplateBuilder.buildReservationConfirmationEmail(reservationEvent);
 
         } else if (event instanceof EmailVerificationEvent verificationEvent) {
-            return EmailVerificationTemplateBuilder.buildVerificationEmail(verificationEvent, recipientName);
+            String actionUrl = verificationEvent.getActionUrl();
+            return EmailVerificationTemplateBuilder.buildVerificationEmail(verificationEvent, recipientName, actionUrl);
         } else {
             return EmailTemplateBuilder.buildPromotionEmail(
                     event.getSubject(),

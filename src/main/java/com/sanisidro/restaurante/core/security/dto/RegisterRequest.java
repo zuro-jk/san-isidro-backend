@@ -19,9 +19,6 @@ public class RegisterRequest {
     @Size(min = 8, message = "La contraseña debe tener al menos 8 caracteres")
     private String password;
 
-    @NotBlank(message = "La confirmación de contraseña es obligatoria")
-    private String confirmPassword;
-
     @NotBlank(message = "El nombre es obligatorio")
     private String firstName;
 

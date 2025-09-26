@@ -1,18 +1,24 @@
 package com.sanisidro.restaurante.core.security.controller;
 
-import com.mercadopago.MercadoPagoConfig;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.sanisidro.restaurante.core.exceptions.InvalidVerificationCodeException;
-import com.sanisidro.restaurante.core.security.dto.*;
-import com.sanisidro.restaurante.core.security.model.User;
+import com.sanisidro.restaurante.core.security.dto.ApiResponse;
+import com.sanisidro.restaurante.core.security.dto.AuthResponse;
+import com.sanisidro.restaurante.core.security.dto.LoginRequest;
+import com.sanisidro.restaurante.core.security.dto.RefreshRequest;
+import com.sanisidro.restaurante.core.security.dto.RegisterRequest;
 import com.sanisidro.restaurante.core.security.service.AuthService;
+
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -22,11 +28,13 @@ public class AuthController {
     private final AuthService authService;
 
     @GetMapping("/verify")
-    public void verifyEmail(@RequestParam String code, HttpServletResponse response) throws IOException {
-        authService.verifyEmail(code);
-//        MercadoPagoConfig.setAccessToken("CREDENCIAL");
-
-        response.sendRedirect("http://localhost:3000/login?verified=true");
+    public ResponseEntity<String> verifyEmail(@RequestParam String code) {
+        try {
+            authService.verifyEmail(code);
+            return ResponseEntity.ok("Correo verificado exitosamente");
+        } catch (InvalidVerificationCodeException e) {
+            return ResponseEntity.badRequest().body("Código inválido o expirado");
+        }
     }
 
     @PostMapping("/login")
@@ -41,10 +49,10 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<Object>> register(@Valid @RequestBody RegisterRequest request) {
-        User user = authService.register(request);
+        Long userId = authService.register(request);
         return ResponseEntity.ok(new ApiResponse<>(true,
-                "Usuario registrado exitosamente. Revisa tu correo para activar la cuenta.",
-                user.getId()));
+                "Se ha registrado correctamente. Revisa tu correo para activar la cuenta.",
+                userId));
     }
 
     @PostMapping("/refresh")

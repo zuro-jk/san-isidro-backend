@@ -1,8 +1,12 @@
 package com.sanisidro.restaurante.features.notifications.dto;
 
-import lombok.*;
-
 import java.math.BigDecimal;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Getter
 @Setter
@@ -20,4 +24,9 @@ public class StockLowNotificationEvent implements NotifiableEvent {
     private String ingredientName;
     private BigDecimal currentStock;
     private BigDecimal minimumStock;
+
+    @Override
+    public String getChannelKey() {
+        return "WEBSOCKET";
+    }
 }

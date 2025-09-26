@@ -1,17 +1,12 @@
 package com.sanisidro.restaurante.core.security.service;
 
-import com.sanisidro.restaurante.core.exceptions.*;
-import com.sanisidro.restaurante.core.security.dto.*;
-import com.sanisidro.restaurante.core.security.jwt.JwtService;
-import com.sanisidro.restaurante.core.security.model.RefreshToken;
-import com.sanisidro.restaurante.core.security.model.Role;
-import com.sanisidro.restaurante.core.security.model.User;
-import com.sanisidro.restaurante.core.security.repository.RefreshTokenRepository;
-import com.sanisidro.restaurante.core.security.repository.RoleRepository;
-import com.sanisidro.restaurante.core.security.repository.UserRepository;
-import com.sanisidro.restaurante.features.notifications.dto.EmailVerificationEvent;
-import com.sanisidro.restaurante.features.notifications.facade.NotificationFacade;
-import lombok.RequiredArgsConstructor;
+import java.time.Instant;
+import java.util.Collections;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -20,12 +15,28 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
-import java.util.Collections;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
+import com.sanisidro.restaurante.core.exceptions.EmailAlreadyExistsException;
+import com.sanisidro.restaurante.core.exceptions.InvalidCredentialsException;
+import com.sanisidro.restaurante.core.exceptions.InvalidRefreshTokenException;
+import com.sanisidro.restaurante.core.exceptions.InvalidVerificationCodeException;
+import com.sanisidro.restaurante.core.exceptions.TooManyAttemptsException;
+import com.sanisidro.restaurante.core.exceptions.UserNotFoundException;
+import com.sanisidro.restaurante.core.exceptions.UsernameAlreadyExistsException;
+import com.sanisidro.restaurante.core.security.dto.AuthResponse;
+import com.sanisidro.restaurante.core.security.dto.LoginRequest;
+import com.sanisidro.restaurante.core.security.dto.RegisterRequest;
+import com.sanisidro.restaurante.core.security.dto.UserProfileResponse;
+import com.sanisidro.restaurante.core.security.jwt.JwtService;
+import com.sanisidro.restaurante.core.security.model.RefreshToken;
+import com.sanisidro.restaurante.core.security.model.Role;
+import com.sanisidro.restaurante.core.security.model.User;
+import com.sanisidro.restaurante.core.security.repository.RefreshTokenRepository;
+import com.sanisidro.restaurante.core.security.repository.RoleRepository;
+import com.sanisidro.restaurante.core.security.repository.UserRepository;
+import com.sanisidro.restaurante.features.notifications.dto.EmailVerificationEvent;
+import com.sanisidro.restaurante.features.notifications.kafka.NotificationProducer;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +45,9 @@ public class AuthService {
     @Value("${app.jwt.refresh-token-expiration}")
     private long refreshTokenExpiration;
 
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
+
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -41,7 +55,8 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final TokenBlacklistService tokenBlacklistService;
-    private final NotificationFacade notificationFacade;
+
+    private final NotificationProducer notificationProducer;
 
     private final int MAX_ATTEMPTS_USER = 5;
     private final int MAX_ATTEMPTS_IP = 10;
@@ -67,10 +82,8 @@ public class AuthService {
 
         try {
             Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(key, request.getPassword())
-            );
+                    new UsernamePasswordAuthenticationToken(key, request.getPassword()));
 
-            // Reset de intentos fallidos
             loginAttempts.remove(key);
             blockedUntil.remove(key);
             ipLoginAttempts.remove(clientIp);
@@ -85,14 +98,12 @@ public class AuthService {
                     user.getUsername(),
                     user.getEmail(),
                     user.isEnabled(),
-                    user.getRoles().stream().map(Role::getName).collect(Collectors.toSet())
-            );
+                    user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()));
 
             return new AuthResponse(
                     jwtService.generateAccessToken(user.getUsername(), Collections.emptyMap()),
                     refreshToken.getToken(),
-                    profile
-            );
+                    profile);
 
         } catch (Exception ex) {
             trackFailedLogin(key, clientIp);
@@ -117,7 +128,7 @@ public class AuthService {
     }
 
     @Transactional
-    public User register(RegisterRequest request) {
+    public Long register(RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new UsernameAlreadyExistsException("Username ya existe");
         }
@@ -147,24 +158,22 @@ public class AuthService {
                 .recipient(user.getEmail())
                 .subject("Verifica tu correo electrónico")
                 .message("Por favor verifica tu correo haciendo clic en el enlace:")
-                .actionUrl("http://localhost:8080/api/v1/auth/verify?code=" + user.getVerificationCode())
+                .actionUrl(frontendUrl + "/verify-email?code=" + user.getVerificationCode())
                 .build();
 
-        notificationFacade.processNotification(event);
+        notificationProducer.send("notifications", event);
 
-        return user;
+        return user.getId();
     }
 
     @Transactional
-    public User verifyEmail(String code) {
+    public void verifyEmail(String code) {
         User user = userRepository.findByVerificationCode(code)
                 .orElseThrow(() -> new InvalidVerificationCodeException("Código de verificación inválido o expirado"));
 
         user.setEmailVerified(true);
         user.setVerificationCode(null);
         userRepository.save(user);
-
-        return user;
     }
 
     @Transactional
@@ -190,8 +199,7 @@ public class AuthService {
                 user.getUsername(),
                 user.getEmail(),
                 user.isEnabled(),
-                user.getRoles().stream().map(Role::getName).collect(Collectors.toSet())
-        );
+                user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()));
 
         return new AuthResponse(newAccessToken, newRefreshToken.getToken(), profile);
     }
@@ -219,7 +227,8 @@ public class AuthService {
         revokeAllRefreshTokens(user);
 
         long expirationMillis = jwtService.getExpirationMillis(accessToken);
-        tokenBlacklistService.blacklistToken(accessToken, username, "logout_all", expirationMillis, clientIp, userAgent);
+        tokenBlacklistService.blacklistToken(accessToken, username, "logout_all", expirationMillis, clientIp,
+                userAgent);
     }
 
     @Transactional

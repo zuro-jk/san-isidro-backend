@@ -1,5 +1,15 @@
 package com.sanisidro.restaurante.core.security.service;
 
+import java.time.Instant;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.sanisidro.restaurante.core.security.dto.AuthResponse;
 import com.sanisidro.restaurante.core.security.dto.UserProfileResponse;
 import com.sanisidro.restaurante.core.security.jwt.JwtService;
@@ -9,17 +19,9 @@ import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.RefreshTokenRepository;
 import com.sanisidro.restaurante.core.security.repository.RoleRepository;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -36,19 +38,16 @@ public class OAuthUserService {
 
     @Transactional
     public AuthResponse processOAuthUser(String provider, String providerId,
-                                         String email, String firstName, String lastName,
-                                         Boolean emailVerified) {
+            String email, String firstName, String lastName,
+            Boolean emailVerified) {
 
         User user = findByProviderId(provider, providerId)
                 .orElseGet(() -> createUserFromOAuth(provider, providerId, email, firstName, lastName, emailVerified));
 
-        // Access token
         String accessToken = jwtService.generateAccessToken(
                 user.getUsername(),
-                Map.of("roles", user.getRoles().stream().map(Role::getName).toList())
-        );
+                Map.of("roles", user.getRoles().stream().map(Role::getName).toList()));
 
-        // Refresh token persistido en DB
         RefreshToken refreshTokenEntity = createRefreshToken(user);
 
         UserProfileResponse userProfile = UserProfileResponse.builder()
@@ -74,18 +73,33 @@ public class OAuthUserService {
         };
     }
 
-    private User createUserFromOAuth(String provider, String providerId, String email, String firstName, String lastName, Boolean emailVerified) {
+    private User createUserFromOAuth(String provider, String providerId, String email, String firstName,
+            String lastName, Boolean emailVerified) {
         User user = new User();
         user.setEmail(email);
         user.setUsername(email);
-        user.setFirstName(firstName);
-        user.setLastName(lastName);
+
+        if (firstName == null && lastName == null) {
+            user.setFirstName(email.split("@")[0]);
+            user.setLastName("");
+        } else if (lastName == null && firstName != null && firstName.contains(" ")) {
+            String[] parts = firstName.split(" ", 2);
+            user.setFirstName(parts[0]);
+            user.setLastName(parts[1]);
+        } else {
+            user.setFirstName(firstName != null ? firstName : email.split("@")[0]);
+            user.setLastName(lastName != null ? lastName : "");
+        }
+
         user.setEnabled(true);
         user.setPassword(null);
         user.setEmailVerified(emailVerified != null && emailVerified);
 
         switch (provider.toLowerCase()) {
-            case "google" -> { user.setGoogleUser(true); user.setGoogleId(providerId); }
+            case "google" -> {
+                user.setGoogleUser(true);
+                user.setGoogleId(providerId);
+            }
             case "facebook" -> user.setFacebookId(providerId);
             case "github" -> user.setGithubId(providerId);
             default -> log.warn("Provider OAuth2 no soportado: {}", provider);

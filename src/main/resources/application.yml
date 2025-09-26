@@ -91,6 +91,9 @@ app:
     allowed-extensions: [".jpg", ".jpeg", ".png", ".pdf", ".mp4", ".mp3"]
     allowed-folders: ["products", "profiles", "general"]
     max-size: 15MB
+  
+  frontend:
+    url: http://localhost:4200
 
 aws:
   s3:
