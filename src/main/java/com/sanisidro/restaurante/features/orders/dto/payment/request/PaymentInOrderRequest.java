@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.features.orders.dto.payment.request;
 
+import com.sanisidro.restaurante.features.orders.enums.PaymentStatus;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -11,20 +12,18 @@ import java.time.LocalDateTime;
 @Data
 public class PaymentInOrderRequest {
 
-    private Long id;
-
     @NotNull(message = "El método de pago es obligatorio")
     private Long paymentMethodId;
 
     @NotNull(message = "El monto es obligatorio")
-    @DecimalMin(value = "0.01", message = "El monto debe ser mayor a cero")
+    @DecimalMin(value = "0.01", message = "El monto debe ser mayor a 0")
     private BigDecimal amount;
 
-    private LocalDateTime date;
-
-    @NotNull(message = "Debe indicar si el pago es en línea o presencial")
+    @NotNull(message = "Debe indicarse si el pago es online o no")
     private Boolean isOnline;
 
-    @Size(max = 100, message = "El código de transacción no puede superar los 100 caracteres")
+    @Size(max = 100, message = "El código de transacción no puede superar 100 caracteres")
     private String transactionCode;
+
+    private PaymentStatus status;
 }

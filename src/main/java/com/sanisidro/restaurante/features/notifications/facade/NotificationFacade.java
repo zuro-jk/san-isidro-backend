@@ -1,9 +1,6 @@
 package com.sanisidro.restaurante.features.notifications.facade;
 
-import com.sanisidro.restaurante.features.notifications.dto.NotifiableEvent;
-import com.sanisidro.restaurante.features.notifications.dto.OrderNotificationEvent;
-import com.sanisidro.restaurante.features.notifications.dto.ReservationNotificationEvent;
-import com.sanisidro.restaurante.features.notifications.dto.StockLowNotificationEvent;
+import com.sanisidro.restaurante.features.notifications.dto.*;
 import com.sanisidro.restaurante.features.notifications.services.NotificationChannel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -25,6 +22,8 @@ public class NotificationFacade {
             channelKey = "EMAIL";
         } else if (event instanceof StockLowNotificationEvent) {
             channelKey = "WEBSOCKET";
+        } else if (event instanceof EmailVerificationEvent) {
+            channelKey = "EMAIL";
         } else {
             throw new IllegalArgumentException("Evento de notificación no soportado: " + event.getClass().getSimpleName());
         }

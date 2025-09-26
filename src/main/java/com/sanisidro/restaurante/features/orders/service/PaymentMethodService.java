@@ -109,6 +109,7 @@ public class PaymentMethodService {
         return PaymentMethodResponse.builder()
                 .id(method.getId())
                 .code(method.getCode())
+                .provider(method.getProvider())
                 .name(translation != null ? translation.getName() : null)
                 .description(translation != null ? translation.getDescription() : null)
                 .build();

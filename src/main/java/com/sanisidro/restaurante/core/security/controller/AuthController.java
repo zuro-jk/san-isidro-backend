@@ -1,17 +1,24 @@
 package com.sanisidro.restaurante.core.security.controller;
 
-import com.sanisidro.restaurante.core.security.dto.*;
-import com.sanisidro.restaurante.core.security.service.AuthService;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
+import com.sanisidro.restaurante.core.exceptions.InvalidVerificationCodeException;
+import com.sanisidro.restaurante.core.security.dto.ApiResponse;
+import com.sanisidro.restaurante.core.security.dto.AuthResponse;
+import com.sanisidro.restaurante.core.security.dto.LoginRequest;
+import com.sanisidro.restaurante.core.security.dto.RefreshRequest;
+import com.sanisidro.restaurante.core.security.dto.RegisterRequest;
+import com.sanisidro.restaurante.core.security.service.AuthService;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -20,19 +27,32 @@ public class AuthController {
 
     private final AuthService authService;
 
+    @GetMapping("/verify")
+    public ResponseEntity<String> verifyEmail(@RequestParam String code) {
+        try {
+            authService.verifyEmail(code);
+            return ResponseEntity.ok("Correo verificado exitosamente");
+        } catch (InvalidVerificationCodeException e) {
+            return ResponseEntity.badRequest().body("Código inválido o expirado");
+        }
+    }
+
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
+
         String clientIp = httpRequest.getRemoteAddr();
-        ApiResponse<AuthResponse> response = authService.login(request, clientIp);
-        return ResponseEntity.ok(response);
+        AuthResponse authResponse = authService.login(request, clientIp);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Login exitoso", authResponse));
     }
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<Object>> register(@Valid @RequestBody RegisterRequest request) {
-        ApiResponse<Object> response = authService.register(request);
-        return ResponseEntity.ok(response);
+        Long userId = authService.register(request);
+        return ResponseEntity.ok(new ApiResponse<>(true,
+                "Se ha registrado correctamente. Revisa tu correo para activar la cuenta.",
+                userId));
     }
 
     @PostMapping("/refresh")
@@ -42,8 +62,9 @@ public class AuthController {
 
         String clientIp = httpRequest.getRemoteAddr();
         String userAgent = httpRequest.getHeader("User-Agent");
-        ApiResponse<AuthResponse> response = authService.refresh(request.getRefreshToken(), clientIp, userAgent);
-        return ResponseEntity.ok(response);
+
+        AuthResponse response = authService.refresh(request.getRefreshToken(), clientIp, userAgent);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Refresh exitoso", response));
     }
 
     @PostMapping("/logout")
@@ -61,13 +82,12 @@ public class AuthController {
         String clientIp = httpRequest.getRemoteAddr();
         String userAgent = httpRequest.getHeader("User-Agent");
 
-        ApiResponse<Object> response = authService.logout(request.getRefreshToken(), accessToken, clientIp, userAgent);
-        return ResponseEntity.ok(response);
+        authService.logout(request.getRefreshToken(), accessToken, clientIp, userAgent);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Logout exitoso", null));
     }
 
     @PostMapping("/logout-all")
     public ResponseEntity<ApiResponse<Object>> logoutAll(HttpServletRequest httpRequest) {
-
         String authHeader = httpRequest.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.badRequest()
@@ -78,7 +98,7 @@ public class AuthController {
         String clientIp = httpRequest.getRemoteAddr();
         String userAgent = httpRequest.getHeader("User-Agent");
 
-        ApiResponse<Object> response = authService.logoutAll(accessToken, clientIp, userAgent);
-        return ResponseEntity.ok(response);
+        authService.logoutAll(accessToken, clientIp, userAgent);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Sesiones cerradas en todos los dispositivos", null));
     }
 }

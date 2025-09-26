@@ -7,7 +7,12 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 @Entity
-@Table(name = "payment_methods")
+@Table(
+        name = "payment_methods",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"code", "provider"})
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,8 +25,11 @@ public class PaymentMethod {
     @Column(name = "payment_method_id")
     private Long id;
 
-    @Column(name = "name", nullable = false, unique = true)
+    @Column(name = "code", nullable = false, length = 50)
     private String code;
+
+    @Column(name = "provider", nullable = false, length = 50)
+    private String provider;
 
     @OneToMany(mappedBy = "paymentMethod", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<PaymentMethodTranslation> translations = new LinkedHashSet<>();

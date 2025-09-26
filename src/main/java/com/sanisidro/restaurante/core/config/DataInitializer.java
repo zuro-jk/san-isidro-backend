@@ -1,24 +1,23 @@
 package com.sanisidro.restaurante.core.config;
 
+import com.sanisidro.restaurante.core.security.model.PaymentProfile;
 import com.sanisidro.restaurante.core.security.model.Role;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.RoleRepository;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
 import com.sanisidro.restaurante.features.customers.enums.LoyaltyRuleType;
+import com.sanisidro.restaurante.features.customers.model.Customer;
 import com.sanisidro.restaurante.features.customers.model.LoyaltyRule;
+import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
 import com.sanisidro.restaurante.features.customers.repository.LoyaltyRuleRepository;
 import com.sanisidro.restaurante.features.employees.enums.EmploymentStatus;
 import com.sanisidro.restaurante.features.employees.model.Employee;
 import com.sanisidro.restaurante.features.employees.model.Position;
 import com.sanisidro.restaurante.features.employees.repository.EmployeeRepository;
 import com.sanisidro.restaurante.features.employees.repository.PositionRepository;
+import com.sanisidro.restaurante.features.orders.model.*;
+import com.sanisidro.restaurante.features.orders.repository.*;
 import com.sanisidro.restaurante.features.products.enums.MovementSource;
-import com.sanisidro.restaurante.features.orders.model.OrderStatus;
-import com.sanisidro.restaurante.features.orders.model.OrderStatusTranslation;
-import com.sanisidro.restaurante.features.orders.model.OrderType;
-import com.sanisidro.restaurante.features.orders.model.OrderTypeTranslation;
-import com.sanisidro.restaurante.features.orders.repository.OrderStatusRepository;
-import com.sanisidro.restaurante.features.orders.repository.OrderTypeRepository;
 import com.sanisidro.restaurante.features.products.enums.MovementType;
 import com.sanisidro.restaurante.features.products.model.*;
 import com.sanisidro.restaurante.features.products.repository.*;
@@ -41,6 +40,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -70,6 +70,9 @@ public class DataInitializer implements CommandLineRunner {
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final EmployeeRepository employeeRepository;
     private final PositionRepository positionRepository;
+    private final PaymentMethodRepository paymentMethodRepository;
+    private final PaymentMethodTranslationRepository paymentMethodTranslationRepository;
+    private final CustomerRepository customerRepository;
 
 
     @Override
@@ -90,6 +93,8 @@ public class DataInitializer implements CommandLineRunner {
         initSuppliers();
         initPurchaseOrders();
         initEmployees();
+        initPaymentMethods();
+        initTestCustomers();
     }
 
     private void initRoles() {
@@ -967,4 +972,193 @@ public class DataInitializer implements CommandLineRunner {
 
         log.info(">>> Empleados inicializados correctamente con usuarios y posiciones");
     }
+
+    private void initPaymentMethods() {
+        if (paymentMethodRepository.count() > 0) {
+            log.info(">>> Métodos de pago ya inicializados");
+            return;
+        }
+
+        log.info(">>> Inicializando métodos de pago...");
+
+        List<PaymentMethod> methods = List.of(
+                PaymentMethod.builder().code("CASH").provider("INTERNAL").build(),
+                PaymentMethod.builder().code("CARD").provider("MERCADOPAGO").build(),
+                PaymentMethod.builder().code("YAPE").provider("INTERNAL").build(),
+                PaymentMethod.builder().code("PLIN").provider("INTERNAL").build(),
+                PaymentMethod.builder().code("TRANSFER").provider("INTERNAL").build()
+        );
+
+        paymentMethodRepository.saveAll(methods);
+
+        List<PaymentMethodTranslation> translations = new ArrayList<>();
+
+        for (PaymentMethod method : methods) {
+            switch (method.getCode()) {
+                case "CASH" -> {
+                    translations.addAll(List.of(
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("es").name("Efectivo")
+                                    .description("Pago en efectivo en el restaurante")
+                                    .build(),
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("en").name("Cash")
+                                    .description("Cash payment at the restaurant")
+                                    .build()
+                    ));
+                }
+                case "CARD" -> {
+                    translations.addAll(List.of(
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("es").name("Tarjeta")
+                                    .description("Pago con tarjeta de crédito o débito vía MercadoPago")
+                                    .build(),
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("en").name("Card")
+                                    .description("Credit or debit card payment via MercadoPago")
+                                    .build()
+                    ));
+                }
+                case "YAPE" -> {
+                    translations.addAll(List.of(
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("es").name("Yape")
+                                    .description("Pago mediante Yape")
+                                    .build(),
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("en").name("Yape")
+                                    .description("Payment via Yape")
+                                    .build()
+                    ));
+                }
+                case "PLIN" -> {
+                    translations.addAll(List.of(
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("es").name("Plin")
+                                    .description("Pago mediante Plin")
+                                    .build(),
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("en").name("Plin")
+                                    .description("Payment via Plin")
+                                    .build()
+                    ));
+                }
+                case "TRANSFER" -> {
+                    translations.addAll(List.of(
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("es").name("Transferencia Bancaria")
+                                    .description("Pago mediante transferencia bancaria")
+                                    .build(),
+                            PaymentMethodTranslation.builder()
+                                    .paymentMethod(method)
+                                    .lang("en").name("Bank Transfer")
+                                    .description("Payment via bank transfer")
+                                    .build()
+                    ));
+                }
+            }
+        }
+
+        paymentMethodTranslationRepository.saveAll(translations);
+
+        log.info(">>> Métodos de pago inicializados correctamente");
+    }
+
+    private void initTestCustomers() {
+        if (userRepository.findByUsername("cliente1").isPresent()) {
+            log.info(">>> Clientes de prueba ya inicializados");
+            return;
+        }
+
+        log.info(">>> Inicializando clientes de prueba...");
+
+        Role clientRole = roleRepository.findByName("ROLE_CLIENT")
+                .orElseThrow(() -> new IllegalStateException("No se encontró ROLE_CLIENT"));
+
+        User user1 = User.builder()
+                .username("cliente1")
+                .email("cliente1@test.com")
+                .firstName("Juan")
+                .lastName("Lopez")
+                .password(passwordEncoder.encode("password123"))
+                .enabled(true)
+                .roles(Set.of(clientRole))
+                .build();
+
+        PaymentProfile profile1 = PaymentProfile.builder()
+                .user(user1)
+                .docType("DNI")
+                .docNumber("12345678")
+                .phone("987654321")
+                .areaCode("51")
+                .street("Av. Principal 123")
+                .city("Lima")
+                .zipCode("15001")
+                .build();
+        user1.setPaymentProfile(profile1);
+
+        User user2 = User.builder()
+                .username("cliente2")
+                .email("cliente2@test.com")
+                .firstName("Ana")
+                .lastName("Martinez")
+                .password(passwordEncoder.encode("password123"))
+                .enabled(true)
+                .roles(Set.of(clientRole))
+                .build();
+
+        PaymentProfile profile2 = PaymentProfile.builder()
+                .user(user2)
+                .docType("DNI")
+                .docNumber("87654321")
+                .phone("987654322")
+                .areaCode("51")
+                .street("Calle Secundaria 456")
+                .city("Lima")
+                .zipCode("15002")
+                .build();
+        user2.setPaymentProfile(profile2);
+
+        User user3 = User.builder()
+                .username("cliente3")
+                .email("cliente3@test.com")
+                .firstName("Luis")
+                .lastName("Gonzalez")
+                .password(passwordEncoder.encode("password123"))
+                .enabled(true)
+                .roles(Set.of(clientRole))
+                .build();
+
+        PaymentProfile profile3 = PaymentProfile.builder()
+                .user(user3)
+                .docType("DNI")
+                .docNumber("11223344")
+                .phone("987654323")
+                .areaCode("51")
+                .street("Jr. Central 789")
+                .city("Lima")
+                .zipCode("15003")
+                .build();
+        user3.setPaymentProfile(profile3);
+
+        userRepository.saveAll(List.of(user1, user2, user3));
+
+        Customer customer1 = Customer.builder().user(user1).points(0).build();
+        Customer customer2 = Customer.builder().user(user2).points(0).build();
+        Customer customer3 = Customer.builder().user(user3).points(0).build();
+
+        customerRepository.saveAll(List.of(customer1, customer2, customer3));
+
+        log.info(">>> Clientes de prueba inicializados correctamente");
+    }
+
 }

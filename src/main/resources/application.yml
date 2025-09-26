@@ -91,6 +91,9 @@ app:
     allowed-extensions: [".jpg", ".jpeg", ".png", ".pdf", ".mp4", ".mp3"]
     allowed-folders: ["products", "profiles", "general"]
     max-size: 15MB
+  
+  frontend:
+    url: http://localhost:4200
 
 aws:
   s3:
@@ -98,3 +101,6 @@ aws:
     region: ${AWS_REGION:us-east-1}
     access-key: ${AWS_ACCESS_KEY_ID}
     secret-key: ${AWS_SECRET_ACCESS_KEY}
+
+mercadopago:
+  access-token: ${MERCADO_PAGO_ACCESS_TOKEN}

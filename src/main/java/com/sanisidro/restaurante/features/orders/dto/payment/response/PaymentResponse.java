@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.features.orders.dto.payment.response;
 
+import com.sanisidro.restaurante.features.orders.enums.PaymentStatus;
 import lombok.Builder;
 import lombok.Data;
 
@@ -17,4 +18,6 @@ public class PaymentResponse {
     private LocalDateTime date;
     private Boolean isOnline;
     private String transactionCode;
+    private String provider;
+    private PaymentStatus status;
 }

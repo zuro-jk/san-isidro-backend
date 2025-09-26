@@ -1,37 +1,40 @@
 package com.sanisidro.restaurante.features.customers.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sanisidro.restaurante.core.dto.response.PagedResponse;
-import com.sanisidro.restaurante.core.exceptions.InvalidReservationException;
-import com.sanisidro.restaurante.core.exceptions.ResourceNotFoundException;
-import com.sanisidro.restaurante.core.kafka.message.KafkaMessage;
-import com.sanisidro.restaurante.core.kafka.producer.KafkaProducerService;
-import com.sanisidro.restaurante.features.customers.dto.reservation.request.ReservationRequest;
-import com.sanisidro.restaurante.features.customers.dto.reservation.response.ReservationResponse;
-import com.sanisidro.restaurante.features.customers.enums.PointHistoryEventType;
-import com.sanisidro.restaurante.features.customers.enums.ReservationStatus;
-import com.sanisidro.restaurante.features.customers.model.Customer;
-import com.sanisidro.restaurante.features.customers.model.PointsHistory;
-import com.sanisidro.restaurante.features.customers.model.Reservation;
-import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
-import com.sanisidro.restaurante.features.customers.repository.ReservationRepository;
-import com.sanisidro.restaurante.features.notifications.dto.ReservationNotificationEvent;
-import com.sanisidro.restaurante.features.restaurant.enums.TableStatus;
-import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
-import com.sanisidro.restaurante.features.restaurant.repository.TableRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.sanisidro.restaurante.core.dto.response.PagedResponse;
+import com.sanisidro.restaurante.core.exceptions.InvalidReservationException;
+import com.sanisidro.restaurante.core.exceptions.ResourceNotFoundException;
+import com.sanisidro.restaurante.features.customers.dto.reservation.request.ReservationRequest;
+import com.sanisidro.restaurante.features.customers.dto.reservation.response.ReservationResponse;
+import com.sanisidro.restaurante.features.customers.enums.PointHistoryEventType;
+import com.sanisidro.restaurante.features.customers.enums.ReservationStatus;
+import com.sanisidro.restaurante.features.customers.model.Customer;
+import com.sanisidro.restaurante.features.customers.model.Reservation;
+import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
+import com.sanisidro.restaurante.features.customers.repository.ReservationRepository;
+import com.sanisidro.restaurante.features.notifications.dto.ReservationNotificationEvent;
+import com.sanisidro.restaurante.features.notifications.kafka.NotificationProducer;
+import com.sanisidro.restaurante.features.restaurant.enums.TableStatus;
+import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
+import com.sanisidro.restaurante.features.restaurant.repository.TableRepository;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
@@ -44,15 +47,13 @@ public class ReservationService {
     private final LoyaltyService loyaltyService;
     private final PointsHistoryService pointsHistoryService;
 
-    private final KafkaProducerService kafkaProducerService;
-    private final ObjectMapper objectMapper;
+    private final NotificationProducer notificationProducer;
 
     private static final ZoneId RESTAURANT_ZONE = ZoneId.of("America/Lima");
 
     private static final Map<ReservationStatus, Set<ReservationStatus>> ALLOWED_TRANSITIONS = Map.of(
             ReservationStatus.PENDING, Set.of(ReservationStatus.CONFIRMED, ReservationStatus.CANCELLED),
-            ReservationStatus.CONFIRMED, Set.of(ReservationStatus.COMPLETED, ReservationStatus.CANCELLED)
-    );
+            ReservationStatus.CONFIRMED, Set.of(ReservationStatus.COMPLETED, ReservationStatus.CANCELLED));
 
     /* -------------------- CREATE -------------------- */
     @Transactional
@@ -61,7 +62,8 @@ public class ReservationService {
         TableEntity table;
 
         if (dto.getTableId() == null) {
-            table = findBestTableForNumberOfPeople(dto.getNumberOfPeople(), dto.getReservationDate(), dto.getReservationTime());
+            table = findBestTableForNumberOfPeople(dto.getNumberOfPeople(), dto.getReservationDate(),
+                    dto.getReservationTime());
             dto.setTableId(table.getId());
         } else {
             table = findTableById(dto.getTableId());
@@ -93,7 +95,8 @@ public class ReservationService {
     }
 
     @Transactional
-    public ReservationResponse createWalkInReservation(Long customerId, Long tableId, int numberOfPeople, boolean sendEmail) {
+    public ReservationResponse createWalkInReservation(Long customerId, Long tableId, int numberOfPeople,
+            boolean sendEmail) {
         Customer customer = findCustomerById(customerId);
 
         TableEntity table;
@@ -109,12 +112,12 @@ public class ReservationService {
 
             // Validar que la mesa pueda recibir walk-in ahora
             startTime = now.toLocalTime().isBefore(table.getOpenTime()) ? table.getOpenTime() : now.toLocalTime();
-            LocalTime reservationEnd = startTime.plusMinutes(table.getReservationDurationMinutes() + table.getBufferAfterMinutes());
+            LocalTime reservationEnd = startTime
+                    .plusMinutes(table.getReservationDurationMinutes() + table.getBufferAfterMinutes());
 
             if (reservationEnd.isAfter(table.getCloseTime())) {
                 throw new InvalidReservationException(
-                        "No se puede hacer walk-in en este momento, la mesa cierra a las " + table.getCloseTime()
-                );
+                        "No se puede hacer walk-in en este momento, la mesa cierra a las " + table.getCloseTime());
             }
         }
 
@@ -269,8 +272,7 @@ public class ReservationService {
                 customer,
                 null,
                 "Reserva completada",
-                reservation.getNumberOfPeople()
-        );
+                reservation.getNumberOfPeople());
 
         if (points > 0) {
             pointsHistoryService.applyPoints(customer, points, PointHistoryEventType.EARNING);
@@ -338,7 +340,8 @@ public class ReservationService {
     }
 
     /* -------------------- VALIDATIONS -------------------- */
-    private void validateReservationFields(ReservationRequest dto, TableEntity table, Long currentReservationId, boolean isWalkIn) {
+    private void validateReservationFields(ReservationRequest dto, TableEntity table, Long currentReservationId,
+            boolean isWalkIn) {
         if (dto.getNumberOfPeople() <= 0)
             throw new InvalidReservationException("El número de personas debe ser mayor a 0");
 
@@ -346,7 +349,8 @@ public class ReservationService {
             throw new InvalidReservationException("La mesa no soporta esa cantidad de personas");
 
         ZonedDateTime now = ZonedDateTime.now(RESTAURANT_ZONE);
-        ZonedDateTime reservationDateTime = ZonedDateTime.of(dto.getReservationDate(), dto.getReservationTime(), RESTAURANT_ZONE);
+        ZonedDateTime reservationDateTime = ZonedDateTime.of(dto.getReservationDate(), dto.getReservationTime(),
+                RESTAURANT_ZONE);
 
         // Validación de anticipación mínima
         if (isWalkIn && reservationDateTime.isBefore(now.minusMinutes(5))) {
@@ -358,7 +362,8 @@ public class ReservationService {
 
         // Horario de la mesa con buffers
         ZonedDateTime reservationStart = reservationDateTime.minusMinutes(table.getBufferBeforeMinutes());
-        ZonedDateTime reservationEnd = reservationDateTime.plusMinutes(table.getReservationDurationMinutes() + table.getBufferAfterMinutes());
+        ZonedDateTime reservationEnd = reservationDateTime
+                .plusMinutes(table.getReservationDurationMinutes() + table.getBufferAfterMinutes());
 
         ZonedDateTime tableOpen = ZonedDateTime.of(dto.getReservationDate(), table.getOpenTime(), RESTAURANT_ZONE);
         ZonedDateTime tableClose = ZonedDateTime.of(dto.getReservationDate(), table.getCloseTime(), RESTAURANT_ZONE);
@@ -369,27 +374,31 @@ public class ReservationService {
         }
 
         // Validación de solapamiento con otras reservas
-        List<Reservation> reservations = reservationRepository.findByTable_IdAndReservationDate(table.getId(), dto.getReservationDate());
+        List<Reservation> reservations = reservationRepository.findByTable_IdAndReservationDate(table.getId(),
+                dto.getReservationDate());
 
         for (Reservation r : reservations) {
-            if (currentReservationId != null && r.getId().equals(currentReservationId)) continue;
+            if (currentReservationId != null && r.getId().equals(currentReservationId))
+                continue;
 
-            ZonedDateTime existingStart = ZonedDateTime.of(r.getReservationDate(), r.getReservationTime(), RESTAURANT_ZONE)
+            ZonedDateTime existingStart = ZonedDateTime
+                    .of(r.getReservationDate(), r.getReservationTime(), RESTAURANT_ZONE)
                     .minusMinutes(r.getTable().getBufferBeforeMinutes());
-            ZonedDateTime existingEnd = ZonedDateTime.of(r.getReservationDate(), r.getReservationTime(), RESTAURANT_ZONE)
+            ZonedDateTime existingEnd = ZonedDateTime
+                    .of(r.getReservationDate(), r.getReservationTime(), RESTAURANT_ZONE)
                     .plusMinutes(r.getTable().getReservationDurationMinutes() + r.getTable().getBufferAfterMinutes());
 
             boolean overlaps = reservationStart.isBefore(existingEnd) && reservationEnd.isAfter(existingStart);
             if (overlaps) {
                 throw new InvalidReservationException(
-                        "La mesa ya está ocupada en ese intervalo de tiempo (incluyendo tiempo de limpieza y preparación)"
-                );
+                        "La mesa ya está ocupada en ese intervalo de tiempo (incluyendo tiempo de limpieza y preparación)");
             }
         }
     }
 
     private void validateStateTransition(Reservation reservation, ReservationStatus newStatus) {
-        if (ALLOWED_TRANSITIONS.getOrDefault(reservation.getStatus(), Set.of()).contains(newStatus)) return;
+        if (ALLOWED_TRANSITIONS.getOrDefault(reservation.getStatus(), Set.of()).contains(newStatus))
+            return;
         throw new InvalidReservationException("No se puede cambiar de " + reservation.getStatus() + " a " + newStatus);
     }
 
@@ -418,8 +427,10 @@ public class ReservationService {
                 .filter(t -> numberOfPeople >= t.getMinCapacity() && numberOfPeople <= t.getCapacity())
                 .toList()) {
 
-            LocalTime startTime = now.toLocalTime().isBefore(table.getOpenTime()) ? table.getOpenTime() : now.toLocalTime();
-            LocalTime reservationEnd = startTime.plusMinutes(table.getReservationDurationMinutes() + table.getBufferAfterMinutes());
+            LocalTime startTime = now.toLocalTime().isBefore(table.getOpenTime()) ? table.getOpenTime()
+                    : now.toLocalTime();
+            LocalTime reservationEnd = startTime
+                    .plusMinutes(table.getReservationDurationMinutes() + table.getBufferAfterMinutes());
 
             if (reservationEnd.isAfter(table.getCloseTime())) {
                 // Esta mesa no puede aceptar walk-in ahora
@@ -467,11 +478,11 @@ public class ReservationService {
             }
         }
 
-        throw new InvalidReservationException("No hay mesas disponibles para " + numberOfPeople + " personas en ese horario");
+        throw new InvalidReservationException(
+                "No hay mesas disponibles para " + numberOfPeople + " personas en ese horario");
     }
 
     private void publishReservationNotification(Reservation reservation, String action) {
-        // Por defecto, enviar solo si es relevante (ya controlado en update)
         try {
             ReservationNotificationEvent event = ReservationNotificationEvent.builder()
                     .userId(reservation.getCustomer().getId())
@@ -484,7 +495,8 @@ public class ReservationService {
                             "Hora: " + reservation.getReservationTime() + "\n\n" +
                             "Gracias por elegirnos!")
                     .reservationId(reservation.getId())
-                    .reservationDate(LocalDateTime.of(reservation.getReservationDate(), reservation.getReservationTime()))
+                    .reservationDate(
+                            LocalDateTime.of(reservation.getReservationDate(), reservation.getReservationTime()))
                     .reservationTime(reservation.getReservationTime().toString())
                     .numberOfPeople(reservation.getNumberOfPeople())
                     .customerName(reservation.getCustomer().getUser().getFullName())
@@ -492,16 +504,7 @@ public class ReservationService {
                     .actionUrl("https://miapp.com/reservations/" + reservation.getId())
                     .build();
 
-            String payload = objectMapper.writeValueAsString(event);
-
-            KafkaMessage message = KafkaMessage.builder()
-                    .topic("notifications")
-                    .key("reservation-" + reservation.getId())
-                    .payload(payload)
-                    .build();
-
-            kafkaProducerService.sendMessage(message);
-
+            notificationProducer.send("notifications", event);
         } catch (Exception e) {
             log.error("❌ Error al publicar notificación de reserva", e);
         }
@@ -532,7 +535,8 @@ public class ReservationService {
         return ReservationResponse.builder()
                 .id(reservation.getId())
                 .customerId(reservation.getCustomer() != null ? reservation.getCustomer().getId() : null)
-                .customerName(reservation.getCustomer() != null ? reservation.getCustomer().getUser().getFullName() : null)
+                .customerName(
+                        reservation.getCustomer() != null ? reservation.getCustomer().getUser().getFullName() : null)
                 .tableId(reservation.getTable() != null ? reservation.getTable().getId() : null)
                 .tableNumber(reservation.getTable() != null ? reservation.getTable().getName() : null)
                 .contactName(reservation.getContactName())
@@ -551,8 +555,7 @@ public class ReservationService {
                 page.getSize(),
                 page.getTotalElements(),
                 page.getTotalPages(),
-                page.isLast()
-        );
+                page.isLast());
     }
 
 }

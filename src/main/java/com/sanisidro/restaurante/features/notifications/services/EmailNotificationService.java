@@ -4,6 +4,7 @@ import com.sanisidro.restaurante.core.email.dto.request.EmailMessageRequest;
 import com.sanisidro.restaurante.core.email.service.EmailService;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
+import com.sanisidro.restaurante.features.notifications.dto.EmailVerificationEvent;
 import com.sanisidro.restaurante.features.notifications.dto.NotifiableEvent;
 import com.sanisidro.restaurante.features.notifications.dto.OrderNotificationEvent;
 import com.sanisidro.restaurante.features.notifications.dto.ReservationNotificationEvent;
@@ -13,9 +14,12 @@ import com.sanisidro.restaurante.features.notifications.model.EmailNotification;
 import com.sanisidro.restaurante.features.notifications.repository.EmailNotificationRepository;
 import com.sanisidro.restaurante.features.notifications.templates.EmailTemplateBuilder;
 import com.sanisidro.restaurante.features.notifications.templates.EmailTemplateBuilder.OrderProduct;
+import com.sanisidro.restaurante.features.notifications.templates.EmailVerificationTemplateBuilder;
 import com.sanisidro.restaurante.features.notifications.templates.ReservationEmailTemplateBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -26,6 +30,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class EmailNotificationService implements NotificationChannel {
+
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
 
     private final EmailService emailService;
     private final EmailNotificationRepository emailNotificationRepository;
@@ -105,7 +112,7 @@ public class EmailNotificationService implements NotificationChannel {
                     ? orderEvent.getProducts().stream()
                     .map(p -> new OrderProduct(p.getName(), p.getUnitPrice(), p.getQuantity()))
                     .collect(Collectors.toList())
-                    : List.of(); // Evita NPE si es null
+                    : List.of();
 
             return EmailTemplateBuilder.buildOrderConfirmationEmail(
                     recipientName,
@@ -114,14 +121,16 @@ public class EmailNotificationService implements NotificationChannel {
                     orderEvent.getTotal(),
                     orderEvent.getOrderDate(),
                     orderEvent.getActionUrl() != null ? orderEvent.getActionUrl() : "#",
-                    orderEvent.getMessage() // mensaje opcional
+                    orderEvent.getMessage()
             );
 
         } else if (event instanceof ReservationNotificationEvent reservationEvent) {
             return ReservationEmailTemplateBuilder.buildReservationConfirmationEmail(reservationEvent);
 
+        } else if (event instanceof EmailVerificationEvent verificationEvent) {
+            String actionUrl = verificationEvent.getActionUrl();
+            return EmailVerificationTemplateBuilder.buildVerificationEmail(verificationEvent, recipientName, actionUrl);
         } else {
-            // Para otros tipos, como promociones
             return EmailTemplateBuilder.buildPromotionEmail(
                     event.getSubject(),
                     event.getMessage(),

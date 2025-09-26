@@ -44,6 +44,9 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private boolean emailVerified = false;
 
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private PaymentProfile paymentProfile;
+
     @Column
     private String verificationCode;
 
