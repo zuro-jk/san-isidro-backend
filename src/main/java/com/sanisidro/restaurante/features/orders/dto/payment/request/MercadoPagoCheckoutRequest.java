@@ -1,9 +1,13 @@
 package com.sanisidro.restaurante.features.orders.dto.payment.request;
 
-import jakarta.validation.constraints.*;
-import lombok.Data;
-
 import java.math.BigDecimal;
+
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
 
 @Data
 public class MercadoPagoCheckoutRequest {
@@ -47,4 +51,6 @@ public class MercadoPagoCheckoutRequest {
     private String city;
 
     private String zipCode = "15001";
+
+    private String paymentMethodId = "visa";
 }

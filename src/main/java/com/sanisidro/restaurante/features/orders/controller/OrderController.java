@@ -1,19 +1,27 @@
 package com.sanisidro.restaurante.features.orders.controller;
 
+import java.util.List;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
 import com.sanisidro.restaurante.features.orders.dto.order.request.OrderRequest;
 import com.sanisidro.restaurante.features.orders.dto.order.response.OrderResponse;
 import com.sanisidro.restaurante.features.orders.dto.payment.request.PaymentInOrderRequest;
-import com.sanisidro.restaurante.features.orders.model.Order;
 import com.sanisidro.restaurante.features.orders.service.OrderService;
 import com.sanisidro.restaurante.features.orders.service.PaymentService;
-import jakarta.persistence.EntityNotFoundException;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -64,8 +72,7 @@ public class OrderController {
     @PostMapping("/{id}/payments/local")
     public ResponseEntity<ApiResponse<Void>> addLocalPayment(
             @PathVariable Long id,
-            @Valid @RequestBody PaymentInOrderRequest request
-    ) {
+            @Valid @RequestBody PaymentInOrderRequest request) {
         orderService.addLocalPayment(id, request);
         return ResponseEntity.ok(new ApiResponse<>(true, "Pago local registrado correctamente", null));
     }

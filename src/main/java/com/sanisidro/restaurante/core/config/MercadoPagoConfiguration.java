@@ -21,7 +21,6 @@ public class MercadoPagoConfiguration {
 
     @Bean
     public PreferenceClient preferenceClient() {
-        // Para crear preferencias de pago (checkout, links, etc.)
         return new PreferenceClient();
     }
 

@@ -345,7 +345,6 @@ public class OrderService {
                                         .orderDate(event.getCreatedAt())
                                         .build();
 
-                        // 3. Enviar a Kafka
                         notificationProducer.send("notifications", notification);
 
                 } catch (Exception e) {
