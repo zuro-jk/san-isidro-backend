@@ -1,6 +1,11 @@
 logging:
   level:
     org.springframework.security: TRACE
+    org.hibernate.SQL: DEBUG         # muestra el SQL que ejecuta Hibernate
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE   # muestra valores de parámetros en las queries
+    org.springframework.transaction: DEBUG  # transacciones de Spring
+    org.springframework.orm.jpa: DEBUG      # capa JPA de Spring
+    org.hibernate.engine.transaction.internal.TransactionImpl: DEBUG  # commits y rollbacks
 
 spring:
 
@@ -21,7 +26,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
@@ -81,7 +86,8 @@ spring:
       timeout: 60000
 
 app:
-  tax: 0.18
+  tax:
+    rate: 0.18
   jwt:
     secret: ${JWT_SECRET:N8sH0LkP7C9y4q1F2B3X6vTj8dW+zR5YhK0pUgQeMnAoIsJcZxVbTfLrGw==}
     access-token-expiration: 3600000       # 1 hora
