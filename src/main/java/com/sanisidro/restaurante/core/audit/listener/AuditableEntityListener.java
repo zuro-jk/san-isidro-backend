@@ -61,10 +61,15 @@ public class AuditableEntityListener {
     @PreRemove
     public void preRemove(Object entity) {
         if (entity instanceof Auditable auditable) {
-            Map<String, Object> oldValue = snapshotEntity(entity);
-            log.debug("PreRemove snapshot: {}", oldValue);
-            logSafe(entity.getClass().getSimpleName(), auditable.getId(), "DELETE",
-                    oldValue, null, SecurityUtils.getCurrentUserId(), SecurityUtils.getCurrentUsername());
+            try {
+                Map<String, Object> oldValue = snapshotEntity(entity);
+                log.debug("PreRemove snapshot: {}", oldValue);
+                logSafe(entity.getClass().getSimpleName(), auditable.getId(), "DELETE",
+                        oldValue, null, SecurityUtils.getCurrentUserId(), SecurityUtils.getCurrentUsername());
+            } catch (Exception e) {
+                log.error("Error en preRemove de {} con id={}: {}",
+                        entity.getClass().getSimpleName(), auditable.getId(), e.getMessage(), e);
+            }
         }
     }
 

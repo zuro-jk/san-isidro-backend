@@ -1,10 +1,8 @@
 package com.sanisidro.restaurante.features.customers.model;
 
 import com.sanisidro.restaurante.core.model.Auditable;
-import com.sanisidro.restaurante.features.customers.dto.address.request.AddressRequest;
+import com.sanisidro.restaurante.features.customers.dto.address.request.AddressAdminRequest;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.*;
 
 @Entity
@@ -21,23 +19,36 @@ public class Address extends Auditable {
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
 
-    @Size(max = 255)
-    @Column(name = "address", columnDefinition = "text", nullable = false)
-    private String address;
+    @Column(name = "street", nullable = false)
+    private String street;
 
-    @Size(max = 255)
-    @Column(name = "reference", columnDefinition = "text")
+    @Column()
     private String reference;
 
+    @Column(length = 100)
+    private String city;
+
+    @Column(length = 100)
+    private String province;
+
+    @Column(length = 20)
+    private String zipCode;
+
+    @Column()
+    private String instructions;
+
     public String getDescription() {
-        if (reference != null && !reference.isBlank()) {
-            return address + " (" + reference + ")";
-        }
-        return address;
+        String desc = street + ", " + city + ", " + province;
+        if (reference != null && !reference.isBlank()) desc += " (" + reference + ")";
+        return desc;
     }
 
-    public void updateFromDto(AddressRequest dto) {
-        if (dto.getAddress() != null) this.address = dto.getAddress();
+    public void updateFromDto(AddressAdminRequest dto) {
+        if (dto.getStreet() != null) this.street = dto.getStreet();
         if (dto.getReference() != null) this.reference = dto.getReference();
+        if (dto.getCity() != null) this.city = dto.getCity();
+        if (dto.getProvince() != null) this.province = dto.getProvince();
+        if (dto.getZipCode() != null) this.zipCode = dto.getZipCode();
+        if (dto.getInstructions() != null) this.instructions = dto.getInstructions();
     }
 }

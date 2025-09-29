@@ -4,20 +4,25 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@AllArgsConstructor
-@NoArgsConstructor
+@Table(name = "user_documents")
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
-public class PaymentProfile {
+public class UserDocument {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne
+    @Column(nullable = true)
+    private String type;
+
+    @Column(nullable = true)
+    private String number;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
-
-    private String docType;
-    private String docNumber;
 }

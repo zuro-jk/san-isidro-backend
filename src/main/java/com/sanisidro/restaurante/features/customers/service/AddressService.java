@@ -1,18 +1,22 @@
 package com.sanisidro.restaurante.features.customers.service;
 
 import com.sanisidro.restaurante.core.dto.response.PagedResponse;
-import com.sanisidro.restaurante.core.exceptions.AddressAlreadyExistsException;
 import com.sanisidro.restaurante.core.exceptions.ResourceNotFoundException;
-import com.sanisidro.restaurante.features.customers.dto.address.request.AddressRequest;
+import com.sanisidro.restaurante.core.security.model.User;
+import com.sanisidro.restaurante.features.customers.dto.address.request.AddressAdminRequest;
+import com.sanisidro.restaurante.features.customers.dto.address.request.AddressCustomerRequest;
 import com.sanisidro.restaurante.features.customers.dto.address.response.AddressResponse;
 import com.sanisidro.restaurante.features.customers.model.Address;
 import com.sanisidro.restaurante.features.customers.model.Customer;
 import com.sanisidro.restaurante.features.customers.repository.AddressRepository;
 import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,24 +34,24 @@ public class AddressService {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Transactional
-    public AddressResponse createAddress(AddressRequest dto) {
+    public AddressResponse createAddressForAdmin(AddressAdminRequest dto) {
         Customer customer = findCustomerById(dto.getCustomerId());
-        String normalizedAddress = normalizeAddress(dto.getAddress());
+        return createAddressInternal(customer, dto.getStreet(), dto.getReference(),
+                dto.getCity(), dto.getProvince(), dto.getZipCode(), dto.getInstructions());
+    }
 
-        if (addressRepository.existsByCustomerAndAddress(customer, normalizedAddress)) {
-            throw new AddressAlreadyExistsException("El cliente ya tiene esta dirección registrada");
-        }
+    @Transactional
+    public AddressResponse createAddressForCustomer(AddressCustomerRequest dto) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        User currentUser = (User) authentication.getPrincipal();
 
-        Address address = Address.builder()
-                .customer(customer)
-                .address(dto.getAddress().trim())
-                .reference(dto.getReference())
-                .build();
+        Customer customer = customerRepository.findByUserId(currentUser.getId())
+                .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado para el usuario autenticado"));
 
-        Address saved = addressRepository.save(address);
-        log.info("Dirección creada para cliente {}: {}", customer.getId(), dto.getAddress());
-
-        return mapToResponse(saved);
+        return createAddressInternal(customer,
+                dto.getStreet(), dto.getReference(),
+                dto.getCity(), dto.getProvince(),
+                dto.getZipCode(), dto.getInstructions());
     }
 
 
@@ -58,7 +62,31 @@ public class AddressService {
     }
 
     @Transactional(readOnly = true)
-    public PagedResponse<AddressResponse> getAddressesByCustomer(Long customerId, Pageable pageable) {
+    public PagedResponse<AddressResponse> getAddressesByCustomerAuth(Pageable pageable) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        User currentUser = (User) authentication.getPrincipal();
+
+        Customer customer = customerRepository.findByUserId(currentUser.getId())
+                .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado para el usuario autenticado"));
+
+        Page<Address> page = addressRepository.findByCustomerId(customer.getId(), pageable);
+        List<AddressResponse> content = page.getContent().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+        return buildPagedResponse(page, content);
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponse<AddressResponse> getAllAddresses( Pageable pageable) {
+        Page<Address> page = addressRepository.findAll(pageable);
+        List<AddressResponse> content = page.getContent().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+        return buildPagedResponse(page, content);
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponse<AddressResponse> getAddressesByCustomerId(Long customerId, Pageable pageable) {
         Page<Address> page = addressRepository.findByCustomerId(customerId, pageable);
         List<AddressResponse> content = page.getContent().stream()
                 .map(this::mapToResponse)
@@ -67,16 +95,8 @@ public class AddressService {
     }
 
     @Transactional
-    public AddressResponse updateAddress(Long id, AddressRequest dto) {
+    public AddressResponse updateAddress(Long id, AddressAdminRequest dto) {
         Address address = findAddressById(id);
-
-        if (dto.getAddress() != null) {
-            String normalizedAddress = normalizeAddress(dto.getAddress());
-            if (!normalizedAddress.equals(normalizeAddress(address.getAddress()))
-                    && addressRepository.existsByCustomerAndAddress(address.getCustomer(), normalizedAddress)) {
-                throw new AddressAlreadyExistsException("El cliente ya tiene esta dirección registrada");
-            }
-        }
 
         address.updateFromDto(dto);
         Address updated = addressRepository.save(address);
@@ -87,18 +107,35 @@ public class AddressService {
 
     @Transactional
     public void deleteAddress(Long id) {
-        Address address = findAddressById(id);
-        addressRepository.delete(address);
-        log.info("Dirección {} eliminada para cliente {}", id, address.getCustomer().getId());
+        Address address = addressRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Not found"));
+        Customer customer = address.getCustomer();
+
+        customer.getAddresses().remove(address);
+    }
+
+
+    private AddressResponse createAddressInternal(Customer customer,
+                                                  String street, String reference,
+                                                  String city, String province,
+                                                  String zipCode, String instructions) {
+        Address address = Address.builder()
+                .customer(customer)
+                .street(street)
+                .reference(reference)
+                .city(city)
+                .province(province)
+                .zipCode(zipCode)
+                .instructions(instructions)
+                .build();
+
+        Address saved = addressRepository.save(address);
+        return mapToResponse(saved);
     }
 
     private Customer findCustomerById(Long id) {
         return customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado"));
-    }
-
-    private String normalizeAddress(String address) {
-        return address == null ? null : address.trim().toLowerCase();
     }
 
     private Address findAddressById(Long id) {
@@ -111,8 +148,12 @@ public class AddressService {
         return AddressResponse.builder()
                 .id(address.getId())
                 .customerId(address.getCustomer().getId())
-                .address(address.getAddress())
+                .street(address.getStreet())
                 .reference(address.getReference())
+                .city(address.getCity())
+                .province(address.getProvince())
+                .zipCode(address.getZipCode())
+                .instructions(address.getInstructions())
                 .createdAt(address.getCreatedAt() != null ? address.getCreatedAt().format(FORMATTER) : null)
                 .updatedAt(address.getUpdatedAt() != null ? address.getUpdatedAt().format(FORMATTER) : null)
                 .createdBy(address.getCreatedBy())

@@ -39,6 +39,12 @@ public class User implements UserDetails {
     @Column
     private String password;
 
+    @Column
+    private String phone;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<UserDocument> documents = new HashSet<>();
+
     private boolean enabled = true;
 
     @Column(nullable = false)

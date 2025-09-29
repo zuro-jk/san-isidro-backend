@@ -14,7 +14,7 @@ import java.util.List;
 @Data
 public class OrderRequest {
 
-    @NotNull(message = "El cliente es obligatorio")
+//    @NotNull(message = "El cliente es obligatorio")
     private Long customerId;
 
     private Long employeeId;
