@@ -17,7 +17,9 @@ public class MercadoPagoCheckoutRequest {
 
     @NotNull(message = "El monto es obligatorio")
     @DecimalMin(value = "0.01", message = "El monto debe ser mayor a 0")
-    private BigDecimal amount;
+    private BigDecimal transactionAmount;
+
+    private Integer installments;
 
     @NotBlank(message = "El token es obligatorio")
     private String token;
@@ -26,31 +28,12 @@ public class MercadoPagoCheckoutRequest {
     @Email(message = "Debe ser un correo válido")
     private String email;
 
-    @NotBlank(message = "El nombre es obligatorio")
-    private String firstName;
-
-    @NotBlank(message = "El apellido es obligatorio")
-    private String lastName;
-
     @NotBlank(message = "El tipo de documento es obligatorio")
     private String docType;
 
     @NotBlank(message = "El número de documento es obligatorio")
     @Size(max = 20, message = "El número de documento no puede superar los 20 caracteres")
     private String docNumber;
-
-    @NotBlank(message = "El teléfono es obligatorio")
-    private String phone;
-
-    private String areaCode = "51";
-
-    @NotBlank(message = "La calle es obligatoria")
-    private String street;
-
-    @NotBlank(message = "La ciudad es obligatoria")
-    private String city;
-
-    private String zipCode = "15001";
 
     private String paymentMethodId = "visa";
 }

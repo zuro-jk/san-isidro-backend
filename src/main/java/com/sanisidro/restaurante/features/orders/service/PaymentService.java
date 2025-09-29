@@ -4,6 +4,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import com.sanisidro.restaurante.core.security.model.PaymentProfile;
+import com.sanisidro.restaurante.core.security.repository.PaymentProfileRepository;
+import com.sanisidro.restaurante.features.orders.model.OrderStatus;
+import com.sanisidro.restaurante.features.orders.repository.OrderStatusRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +35,8 @@ public class PaymentService {
     private final OrderRepository orderRepository;
     private final PaymentMethodRepository paymentMethodRepository;
     private final MercadoPagoService mercadoPagoService;
+    private final PaymentProfileRepository paymentProfileRepository;
+    private final OrderStatusRepository orderStatusRepository;
 
     public List<PaymentResponse> getAll() {
         return paymentRepository.findAll().stream()
@@ -47,14 +53,27 @@ public class PaymentService {
     @Transactional
     public PaymentResponse createOnlinePayment(OnlineCheckoutRequest request) {
         Order order = orderRepository.findById(request.getOrderId())
-                .orElseThrow(() -> new EntityNotFoundException("Orden no encontrada con id: " + request.getOrderId()));
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Orden no encontrada con id: " + request.getOrderId()));
 
         PaymentMethod method = paymentMethodRepository.findByCodeAndProvider("CARD", "MERCADOPAGO")
                 .orElseThrow(() -> new EntityNotFoundException(
                         "Método de pago no configurado para provider: MERCADOPAGO"));
 
+        var user = order.getCustomer().getUser();
+        PaymentProfile paymentProfile = user.getPaymentProfile();
+        if (paymentProfile == null) {
+            paymentProfile = PaymentProfile.builder()
+                    .user(user)
+                    .docType(request.getDocType())
+                    .docNumber(request.getDocNumber())
+                    .build();
+            user.setPaymentProfile(paymentProfile);
+            paymentProfileRepository.save(paymentProfile);
+        }
+
         try {
-            MercadoPagoCheckoutRequest mpRequest = mapToMercadoPagoRequest(order, request.getToken());
+            MercadoPagoCheckoutRequest mpRequest = mapToMercadoPagoRequest(order, request, paymentProfile);
 
             var mpPayment = mercadoPagoService.createPayment(mpRequest);
 
@@ -65,6 +84,7 @@ public class PaymentService {
                 default -> PaymentStatus.PENDING;
             };
 
+            // Guardar el pago en DB
             Payment payment = Payment.builder()
                     .order(order)
                     .paymentMethod(method)
@@ -75,7 +95,17 @@ public class PaymentService {
                     .date(LocalDateTime.now())
                     .build();
 
-            return mapToResponse(paymentRepository.save(payment));
+            Payment savedPayment = paymentRepository.save(payment);
+
+            // Actualizar estado de la orden si el pago fue confirmado
+            if (status == PaymentStatus.CONFIRMED) {
+                OrderStatus confirmedStatus = orderStatusRepository.findByCode("CONFIRMED")
+                        .orElseThrow(() -> new EntityNotFoundException("Estado CONFIRMED no encontrado"));
+                order.setStatus(confirmedStatus);
+                orderRepository.save(order);
+            }
+
+            return mapToResponse(savedPayment);
 
         } catch (Exception e) {
             throw new RuntimeException("Error creando pago online con MercadoPago", e);
@@ -132,30 +162,16 @@ public class PaymentService {
         paymentRepository.save(payment);
     }
 
-    private MercadoPagoCheckoutRequest mapToMercadoPagoRequest(Order order, String token) {
-        var customer = order.getCustomer();
-        var user = customer.getUser();
-        var paymentProfile = user.getPaymentProfile();
-
-        if (paymentProfile == null) {
-            throw new RuntimeException("El usuario no tiene un PaymentProfile configurado");
-        }
-
+    private MercadoPagoCheckoutRequest mapToMercadoPagoRequest(Order order, OnlineCheckoutRequest request, PaymentProfile paymentProfile) {
         MercadoPagoCheckoutRequest mpRequest = new MercadoPagoCheckoutRequest();
         mpRequest.setOrderId(order.getId());
-        mpRequest.setAmount(order.getTotal());
-        mpRequest.setToken(token);
-        mpRequest.setEmail(user.getEmail());
-        mpRequest.setFirstName(user.getFirstName());
-        mpRequest.setLastName(user.getLastName());
+        mpRequest.setTransactionAmount(request.getTransactionAmount());
+        mpRequest.setInstallments(request.getInstallments());
+        mpRequest.setToken(request.getToken());
+        mpRequest.setEmail(request.getEmail());
         mpRequest.setDocType(paymentProfile.getDocType());
         mpRequest.setDocNumber(paymentProfile.getDocNumber());
-        mpRequest.setPhone(paymentProfile.getPhone());
-        mpRequest.setAreaCode(paymentProfile.getAreaCode() != null ? paymentProfile.getAreaCode() : "51");
-        mpRequest.setStreet(paymentProfile.getStreet());
-        mpRequest.setCity(paymentProfile.getCity());
-        mpRequest.setZipCode(paymentProfile.getZipCode() != null ? paymentProfile.getZipCode() : "15001");
-        mpRequest.setPaymentMethodId("visa");
+        mpRequest.setPaymentMethodId(request.getPaymentMethodId());
 
         return mpRequest;
     }

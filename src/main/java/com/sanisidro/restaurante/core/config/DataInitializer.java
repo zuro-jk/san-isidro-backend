@@ -490,6 +490,12 @@ public class DataInitializer implements CommandLineRunner {
                 OrderStatusTranslation.builder().orderStatus(completed).lang("es").name("Completado").description("El pedido ha sido completado").build()
         ));
 
+        OrderStatus confirmed = OrderStatus.builder().code("CONFIRMED").build();
+        confirmed.getTranslations().addAll(List.of(
+                OrderStatusTranslation.builder().orderStatus(confirmed).lang("en").name("Completed").description("Order payment has been confirmed").build(),
+                OrderStatusTranslation.builder().orderStatus(confirmed).lang("es").name("Completado").description("El pago del pedido ha sido confirmado").build()
+        ));
+
         OrderStatus cancelled = OrderStatus.builder().code("CANCELLED").build();
         cancelled.getTranslations().addAll(List.of(
                 OrderStatusTranslation.builder().orderStatus(cancelled).lang("en").name("Cancelled").description("Order has been cancelled").build(),
@@ -502,7 +508,7 @@ public class DataInitializer implements CommandLineRunner {
                 OrderStatusTranslation.builder().orderStatus(failed).lang("es").name("Fallido").description("El pedido no pudo ser procesado").build()
         ));
 
-        List<OrderStatus> statuses = List.of(pending, inProgress, readyForPickup, completed, cancelled, failed);
+        List<OrderStatus> statuses = List.of(pending, inProgress, readyForPickup, confirmed, cancelled, failed);
         orderStatusRepository.saveAll(statuses);
 
         statuses.forEach(s -> log.info(">>> OrderStatus '{}' inicializado con traducciones", s.getCode()));
@@ -1098,11 +1104,6 @@ public class DataInitializer implements CommandLineRunner {
                 .user(user1)
                 .docType("DNI")
                 .docNumber("12345678")
-                .phone("987654321")
-                .areaCode("51")
-                .street("Av. Principal 123")
-                .city("Lima")
-                .zipCode("15001")
                 .build();
         user1.setPaymentProfile(profile1);
 
@@ -1120,11 +1121,6 @@ public class DataInitializer implements CommandLineRunner {
                 .user(user2)
                 .docType("DNI")
                 .docNumber("87654321")
-                .phone("987654322")
-                .areaCode("51")
-                .street("Calle Secundaria 456")
-                .city("Lima")
-                .zipCode("15002")
                 .build();
         user2.setPaymentProfile(profile2);
 
@@ -1142,11 +1138,6 @@ public class DataInitializer implements CommandLineRunner {
                 .user(user3)
                 .docType("DNI")
                 .docNumber("11223344")
-                .phone("987654323")
-                .areaCode("51")
-                .street("Jr. Central 789")
-                .city("Lima")
-                .zipCode("15003")
                 .build();
         user3.setPaymentProfile(profile3);
 

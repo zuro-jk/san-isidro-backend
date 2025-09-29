@@ -20,9 +20,4 @@ public class PaymentProfile {
 
     private String docType;
     private String docNumber;
-    private String phone;
-    private String areaCode;
-    private String street;
-    private String city;
-    private String zipCode;
 }

@@ -29,7 +29,6 @@ import lombok.RequiredArgsConstructor;
 public class OrderController {
 
     private final OrderService orderService;
-    private final PaymentService paymentService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getAll(

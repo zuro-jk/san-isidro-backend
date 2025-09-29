@@ -6,6 +6,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.sanisidro.restaurante.features.orders.model.*;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -31,10 +32,6 @@ import com.sanisidro.restaurante.features.orders.dto.order.response.OrderRespons
 import com.sanisidro.restaurante.features.orders.dto.orderdetail.request.OrderDetailInOrderRequest;
 import com.sanisidro.restaurante.features.orders.dto.orderdetail.response.OrderDetailInOrderResponse;
 import com.sanisidro.restaurante.features.orders.dto.payment.request.PaymentInOrderRequest;
-import com.sanisidro.restaurante.features.orders.model.Order;
-import com.sanisidro.restaurante.features.orders.model.OrderDetail;
-import com.sanisidro.restaurante.features.orders.model.OrderStatus;
-import com.sanisidro.restaurante.features.orders.model.OrderType;
 import com.sanisidro.restaurante.features.orders.repository.OrderRepository;
 import com.sanisidro.restaurante.features.orders.repository.OrderStatusRepository;
 import com.sanisidro.restaurante.features.orders.repository.OrderTypeRepository;
@@ -412,18 +409,27 @@ public class OrderService {
         }
     }
 
+    private String normalizeLang(String lang) {
+        if (lang == null || lang.isEmpty()) return "es"; // default
+        if (lang.startsWith("es")) return "es";
+        if (lang.startsWith("en")) return "en";
+        return "es"; // fallback
+    }
+
     private String getStatusName(OrderStatus status, String lang) {
+        String normalizedLang = normalizeLang(lang);
         return status.getTranslations().stream()
-                .filter(t -> t.getLang().equalsIgnoreCase(lang))
-                .map(t -> t.getName())
+                .filter(t -> t.getLang().equalsIgnoreCase(normalizedLang))
+                .map(OrderStatusTranslation::getName)
                 .findFirst()
                 .orElse("Sin nombre");
     }
 
     private String getTypeName(OrderType type, String lang) {
+        String normalizedLang = normalizeLang(lang);
         return type.getTranslations().stream()
-                .filter(t -> t.getLang().equalsIgnoreCase(lang))
-                .map(t -> t.getName())
+                .filter(t -> t.getLang().equalsIgnoreCase(normalizedLang))
+                .map(OrderTypeTranslation::getName)
                 .findFirst()
                 .orElse("Sin nombre");
     }
