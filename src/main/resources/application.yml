@@ -1,11 +1,11 @@
 logging:
   level:
     org.springframework.security: TRACE
-    org.hibernate.SQL: DEBUG         # muestra el SQL que ejecuta Hibernate
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE   # muestra valores de parámetros en las queries
-    org.springframework.transaction: DEBUG  # transacciones de Spring
-    org.springframework.orm.jpa: DEBUG      # capa JPA de Spring
-    org.hibernate.engine.transaction.internal.TransactionImpl: DEBUG  # commits y rollbacks
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.transaction: DEBUG
+    org.springframework.orm.jpa: DEBUG
+    org.hibernate.engine.transaction.internal.TransactionImpl: DEBUG
 
 spring:
 
@@ -86,18 +86,19 @@ spring:
       timeout: 60000
 
 app:
+  reservation:
+    buffer-before-minutes: 10
+    buffer-after-minutes: 15
   tax:
     rate: 0.18
   jwt:
     secret: ${JWT_SECRET:N8sH0LkP7C9y4q1F2B3X6vTj8dW+zR5YhK0pUgQeMnAoIsJcZxVbTfLrGw==}
     access-token-expiration: 3600000       # 1 hora
     refresh-token-expiration: 1209600000   # 14 dias
-
   file:
     allowed-extensions: [".jpg", ".jpeg", ".png", ".pdf", ".mp4", ".mp3"]
     allowed-folders: ["products", "profiles", "general"]
     max-size: 15MB
-  
   frontend:
     url: http://localhost:4200
 

@@ -125,7 +125,10 @@ public class EmailNotificationService implements NotificationChannel {
             );
 
         } else if (event instanceof ReservationNotificationEvent reservationEvent) {
-            return ReservationEmailTemplateBuilder.buildReservationConfirmationEmail(reservationEvent);
+            return ReservationEmailTemplateBuilder.buildReservationConfirmationEmail(
+                    reservationEvent,
+                    frontendUrl
+            );
 
         } else if (event instanceof EmailVerificationEvent verificationEvent) {
             String actionUrl = verificationEvent.getActionUrl();

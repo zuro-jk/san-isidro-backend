@@ -1,6 +1,5 @@
 package com.sanisidro.restaurante.features.customers.dto.reservation.request;
 
-import com.sanisidro.restaurante.features.customers.enums.ReservationStatus;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
@@ -12,10 +11,7 @@ import java.time.LocalTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ReservationRequest implements BaseReservationRequest {
-
-    @NotNull(message = "Cliente es obligatorio")
-    private Long customerId;
+public class AuthenticatedReservationRequest implements BaseReservationRequest {
 
     @NotNull(message = "Mesa es obligatoria")
     private Long tableId;
@@ -39,6 +35,4 @@ public class ReservationRequest implements BaseReservationRequest {
     @Min(value = 1, message = "Minimo 1 persona por reserva")
     @Max(value = 50, message = "Numero máximo de personas por reserva es 50")
     private Integer numberOfPeople;
-
-    private ReservationStatus status;
 }

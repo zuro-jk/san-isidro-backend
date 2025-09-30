@@ -1,22 +1,36 @@
 package com.sanisidro.restaurante.features.restaurant.service;
 
+import com.sanisidro.restaurante.core.config.ReservationProperties;
+import com.sanisidro.restaurante.features.customers.model.Reservation;
+import com.sanisidro.restaurante.features.customers.repository.ReservationRepository;
 import com.sanisidro.restaurante.features.restaurant.dto.table.request.TableRequest;
+import com.sanisidro.restaurante.features.restaurant.dto.table.response.TableAvailabilityResponse;
 import com.sanisidro.restaurante.features.restaurant.dto.table.response.TableResponse;
 import com.sanisidro.restaurante.features.restaurant.enums.TableStatus;
 import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
 import com.sanisidro.restaurante.features.restaurant.repository.TableRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TableService {
 
     private final TableRepository tableRepository;
+    private final ReservationProperties reservationProperties;
+    private final ReservationRepository reservationRepository;
+
 
     public List<TableResponse> getAllTables() {
         return tableRepository.findAll()
@@ -32,14 +46,14 @@ public class TableService {
     }
 
     public TableResponse createTable(TableRequest request) {
-        validateTableRequest(request); // <- nueva validación cruzada
+        validateTableRequest(request);
         TableEntity table = mapToEntity(request);
         table.setStatus(TableStatus.FREE);
         return mapToResponse(tableRepository.save(table));
     }
 
     public TableResponse updateTable(Long id, TableRequest request) {
-        validateTableRequest(request); // <- validación cruzada
+        validateTableRequest(request);
         TableEntity table = tableRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Mesa no encontrada con id: " + id));
 
@@ -63,6 +77,117 @@ public class TableService {
                 .orElseThrow(() -> new EntityNotFoundException("Mesa no encontrada con id: " + id));
         tableRepository.delete(table);
     }
+
+    /* -------------------- DISPONIBILIDAD -------------------- */
+
+    public boolean isTableAvailable(Long tableId, String startTime, int numberOfPeople, boolean includeBuffers) {
+        TableEntity table = tableRepository.findById(tableId)
+                .orElseThrow(() -> new EntityNotFoundException("Mesa no encontrada con id: " + tableId));
+
+        if (!table.canAccommodate(numberOfPeople)) return false;
+
+        LocalDateTime start = LocalDateTime.parse(startTime);
+        LocalDateTime end = start.plusMinutes(table.getReservationDurationMinutes());
+
+        if (includeBuffers) {
+            int before = table.getBufferBeforeMinutes() != null ? table.getBufferBeforeMinutes() : reservationProperties.getBufferBeforeMinutes();
+            int after = table.getBufferAfterMinutes() != null ? table.getBufferAfterMinutes() : reservationProperties.getBufferAfterMinutes();
+
+            start = start.minusMinutes(before);
+            end = end.plusMinutes(after);
+        }
+
+        // Verificar si la mesa está abierta en ese horario
+        LocalTime reservationStartTime = start.toLocalTime();
+        LocalTime reservationEndTime = end.toLocalTime();
+        if (reservationStartTime.isBefore(table.getOpenTime()) || reservationEndTime.isAfter(table.getCloseTime())) {
+            return false;
+        }
+
+        List<Reservation> overlapping = reservationRepository.findOverlappingReservations(tableId, start, end);
+        return overlapping.isEmpty();
+    }
+
+    /* -------------------- MESAS DISPONIBLES Y ÓPTIMA -------------------- */
+
+    public List<TableResponse> getAvailableTables(int numberOfPeople, String startTime) {
+        return tableRepository.findAll()
+                .stream()
+                .filter(t -> t.canAccommodate(numberOfPeople))
+                .filter(t -> isTableAvailable(t.getId(), startTime, numberOfPeople, true))
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    public TableResponse findOptimalTable(int numberOfPeople, String startTime) {
+        return tableRepository.findAll()
+                .stream()
+                .filter(t -> t.canAccommodate(numberOfPeople))
+                .filter(t -> isTableAvailable(t.getId(), startTime, numberOfPeople, true))
+                .min(Comparator.comparingInt(t -> t.getOptimalCapacity()))
+                .map(this::mapToResponse)
+                .orElseThrow(() -> new EntityNotFoundException("No hay mesas disponibles para este horario y número de personas"));
+    }
+
+    public List<TableAvailabilityResponse> getTablesWithAvailableTimes(int numberOfPeople, LocalDateTime date, boolean filterByCapacity) {
+        List<TableAvailabilityResponse> results = new ArrayList<>();
+
+        for (TableEntity table : tableRepository.findAll()) {
+
+            if (filterByCapacity && !table.canAccommodate(numberOfPeople)) {
+                log.info("Mesa {} descartada: no puede acomodar {} personas.", table.getName(), numberOfPeople);
+                continue;
+            }
+
+            List<String> availableTimes = calculateAvailableTimes(table, date);
+            log.info("Mesa {} - Horarios calculados: {}", table.getName(), availableTimes);
+
+            TableAvailabilityResponse response = TableAvailabilityResponse.builder()
+                    .id(table.getId())
+                    .name(table.getName())
+                    .capacity(table.getCapacity())
+                    .minCapacity(table.getMinCapacity())
+                    .availableTimes(availableTimes)
+                    .build();
+
+            results.add(response);
+        }
+
+        log.info("TOTAL mesas retornadas: {}", results.size());
+        return results;
+    }
+
+    private List<String> calculateAvailableTimes(TableEntity table, LocalDateTime date) {
+        List<String> times = new ArrayList<>();
+        LocalDateTime start = LocalDateTime.of(date.toLocalDate(), table.getOpenTime());
+        LocalDateTime endOfDay = LocalDateTime.of(date.toLocalDate(), table.getCloseTime());
+        int incrementMinutes = 30;
+
+        int bufferBefore = table.getBufferBeforeMinutes() != null ? table.getBufferBeforeMinutes() : reservationProperties.getBufferBeforeMinutes();
+        int bufferAfter = table.getBufferAfterMinutes() != null ? table.getBufferAfterMinutes() : reservationProperties.getBufferAfterMinutes();
+
+        while (!start.plusMinutes(table.getReservationDurationMinutes()).isAfter(endOfDay)) {
+            LocalDateTime slotStart = start.minusMinutes(bufferBefore);
+            LocalDateTime slotEnd = start.plusMinutes(table.getReservationDurationMinutes() + bufferAfter);
+
+            if (slotStart.toLocalTime().isBefore(table.getOpenTime()) || slotEnd.toLocalTime().isAfter(table.getCloseTime())) {
+                start = start.plusMinutes(incrementMinutes);
+                continue;
+            }
+
+            List<Reservation> overlapping = reservationRepository.findOverlappingReservations(table.getId(), slotStart, slotEnd);
+
+            if (overlapping.isEmpty()) {
+                times.add(start.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")));
+            }
+
+            start = start.plusMinutes(incrementMinutes);
+        }
+
+        return times;
+    }
+
+    /* -------------------- UTILIDADES -------------------- */
 
     private TableResponse mapToResponse(TableEntity table) {
         return TableResponse.builder()
@@ -105,11 +230,9 @@ public class TableService {
         if (request.getOptimalCapacity() > request.getCapacity()) {
             throw new IllegalArgumentException("La capacidad óptima no puede ser mayor que la capacidad máxima");
         }
-
         if (request.getOpenTime().isAfter(request.getCloseTime()) || request.getOpenTime().equals(request.getCloseTime())) {
             throw new IllegalArgumentException("La hora de apertura debe ser anterior a la hora de cierre");
         }
-
         if (request.getReservationDurationMinutes() <= 0) {
             throw new IllegalArgumentException("La duración de la reserva debe ser mayor a 0");
         }

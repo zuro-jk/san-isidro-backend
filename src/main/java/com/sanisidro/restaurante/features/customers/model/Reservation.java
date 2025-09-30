@@ -1,12 +1,14 @@
 package com.sanisidro.restaurante.features.customers.model;
 
 import com.sanisidro.restaurante.core.model.Auditable;
+import com.sanisidro.restaurante.features.customers.dto.reservation.request.BaseReservationRequest;
 import com.sanisidro.restaurante.features.customers.dto.reservation.request.ReservationRequest;
 import com.sanisidro.restaurante.features.customers.enums.ReservationStatus;
 import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
@@ -50,14 +52,24 @@ public class Reservation extends Auditable {
     @Column(name = "status", length = 50)
     private ReservationStatus status = ReservationStatus.PENDING;
 
-    public void updateFromDto(ReservationRequest dto, Customer customer, TableEntity table) {
+    @Formula("CAST(reservation_date || ' ' || reservation_time AS timestamp)")
+    private LocalDateTime startDateTime;
+
+    @Formula("(CAST(reservation_date || ' ' || reservation_time AS timestamp) + INTERVAL '60 MINUTE')")
+    private LocalDateTime endDateTime;
+
+    public void updateFromDto(BaseReservationRequest dto, Customer customer, TableEntity table) {
         if (dto.getContactName() != null) this.contactName = dto.getContactName().trim();
         if (dto.getContactPhone() != null) this.contactPhone = dto.getContactPhone().trim();
         if (dto.getReservationDate() != null) this.reservationDate = dto.getReservationDate();
         if (dto.getReservationTime() != null) this.reservationTime = dto.getReservationTime();
         if (dto.getNumberOfPeople() != null) this.numberOfPeople = dto.getNumberOfPeople();
-        if (dto.getStatus() != null) this.status = dto.getStatus();
         if (customer != null) this.customer = customer;
         if (table != null) this.table = table;
+
+        if (dto instanceof ReservationRequest req && req.getStatus() != null) {
+            this.status = req.getStatus();
+        }
     }
+
 }
