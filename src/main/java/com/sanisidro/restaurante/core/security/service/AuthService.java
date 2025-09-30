@@ -3,6 +3,7 @@ package com.sanisidro.restaurante.core.security.service;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -94,11 +95,25 @@ public class AuthService {
 
             RefreshToken refreshToken = createRefreshToken(user);
 
-            UserProfileResponse profile = new UserProfileResponse(
-                    user.getUsername(),
-                    user.getEmail(),
-                    user.isEnabled(),
-                    user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()));
+            Set<String> roles = user.getRoles().stream()
+                    .map(Role::getName)
+                    .collect(Collectors.toSet());
+
+            UserProfileResponse profile = UserProfileResponse.builder()
+                    .username(user.getUsername())
+                    .email(user.getEmail())
+                    .enabled(user.isEnabled())
+                    .roles(roles)
+                    .firstName(user.getFirstName())
+                    .lastName(user.getLastName())
+                    .fullName(user.getFullName())
+                    .phone(user.getPhone())
+                    .isGoogleUser(user.isGoogleUser())
+                    .googleId(user.getGoogleId())
+                    .facebookId(user.getFacebookId())
+                    .githubId(user.getGithubId())
+                    .build();
+
 
             return new AuthResponse(
                     jwtService.generateAccessToken(user.getUsername(), Collections.emptyMap()),
@@ -195,11 +210,24 @@ public class AuthService {
         refreshTokenRepository.delete(refreshToken);
         RefreshToken newRefreshToken = createRefreshToken(user);
 
-        UserProfileResponse profile = new UserProfileResponse(
-                user.getUsername(),
-                user.getEmail(),
-                user.isEnabled(),
-                user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()));
+        Set<String> roles = user.getRoles().stream()
+                .map(Role::getName)
+                .collect(Collectors.toSet());
+
+        UserProfileResponse profile = UserProfileResponse.builder()
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .enabled(user.isEnabled())
+                .roles(roles)
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .fullName(user.getFullName())
+                .phone(user.getPhone())
+                .isGoogleUser(user.isGoogleUser())
+                .googleId(user.getGoogleId())
+                .facebookId(user.getFacebookId())
+                .githubId(user.getGithubId())
+                .build();
 
         return new AuthResponse(newAccessToken, newRefreshToken.getToken(), profile);
     }

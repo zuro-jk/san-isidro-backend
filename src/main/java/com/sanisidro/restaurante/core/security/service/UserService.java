@@ -32,7 +32,20 @@ public class UserService {
                 .map(Role::getName)
                 .collect(Collectors.toSet());
 
-        return new UserProfileResponse(user.getUsername(), user.getEmail(), user.isEnabled(), roles);
+        return UserProfileResponse.builder()
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .enabled(user.isEnabled())
+                .roles(roles)
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .fullName(user.getFullName())
+                .phone(user.getPhone())
+                .isGoogleUser(user.isGoogleUser())
+                .googleId(user.getGoogleId())
+                .facebookId(user.getFacebookId())
+                .githubId(user.getGithubId())
+                .build();
     }
 
     @Transactional
