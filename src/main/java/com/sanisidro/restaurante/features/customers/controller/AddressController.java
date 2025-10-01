@@ -2,6 +2,7 @@ package com.sanisidro.restaurante.features.customers.controller;
 
 import com.sanisidro.restaurante.core.dto.response.PagedResponse;
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
+import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.features.customers.dto.address.request.AddressAdminRequest;
 import com.sanisidro.restaurante.features.customers.dto.address.request.AddressCustomerRequest;
 import com.sanisidro.restaurante.features.customers.dto.address.response.AddressResponse;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -33,8 +35,10 @@ public class AddressController {
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<PagedResponse<AddressResponse>>> getMyAddresses(
-            Pageable pageable) {
-        PagedResponse<AddressResponse> paged = addressService.getAddressesByCustomerAuth(pageable);
+            @AuthenticationPrincipal User user,
+            Pageable pageable
+    ) {
+        PagedResponse<AddressResponse> paged = addressService.getAddressesByCustomerAuth(user, pageable);
         return ResponseEntity.ok(new ApiResponse<>(true, "Mis direcciones obtenidas", paged));
     }
 

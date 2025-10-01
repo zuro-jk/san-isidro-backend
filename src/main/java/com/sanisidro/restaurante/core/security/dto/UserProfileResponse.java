@@ -20,9 +20,7 @@ public class UserProfileResponse {
     private String lastName;
     private String fullName;
     private String phone;
-    private boolean isGoogleUser;
-    private String googleId;
-    private String facebookId;
-    private String githubId;
+    private String provider;
+    private boolean hasPassword;
 
 }

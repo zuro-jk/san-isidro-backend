@@ -1,13 +1,12 @@
 package com.sanisidro.restaurante.core.security.service;
 
 import java.time.Instant;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import com.sanisidro.restaurante.core.security.dto.*;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -23,10 +22,6 @@ import com.sanisidro.restaurante.core.exceptions.InvalidVerificationCodeExceptio
 import com.sanisidro.restaurante.core.exceptions.TooManyAttemptsException;
 import com.sanisidro.restaurante.core.exceptions.UserNotFoundException;
 import com.sanisidro.restaurante.core.exceptions.UsernameAlreadyExistsException;
-import com.sanisidro.restaurante.core.security.dto.AuthResponse;
-import com.sanisidro.restaurante.core.security.dto.LoginRequest;
-import com.sanisidro.restaurante.core.security.dto.RegisterRequest;
-import com.sanisidro.restaurante.core.security.dto.UserProfileResponse;
 import com.sanisidro.restaurante.core.security.jwt.JwtService;
 import com.sanisidro.restaurante.core.security.model.RefreshToken;
 import com.sanisidro.restaurante.core.security.model.Role;
@@ -70,7 +65,10 @@ public class AuthService {
     private final Map<String, Long> ipBlockedUntil = new ConcurrentHashMap<>();
 
     @Transactional
-    public AuthResponse login(LoginRequest request, String clientIp) {
+    public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
+        String clientIp = httpRequest.getRemoteAddr();
+        String userAgent = httpRequest.getHeader("User-Agent");
+
         String key = request.getUsernameOrEmail();
 
         if (blockedUntil.containsKey(key) && blockedUntil.get(key) > System.currentTimeMillis()) {
@@ -93,7 +91,7 @@ public class AuthService {
             User user = userRepository.findByUsername(authentication.getName())
                     .orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
 
-            RefreshToken refreshToken = createRefreshToken(user);
+            RefreshToken refreshToken = createRefreshToken(user, clientIp, userAgent);
 
             Set<String> roles = user.getRoles().stream()
                     .map(Role::getName)
@@ -108,37 +106,18 @@ public class AuthService {
                     .lastName(user.getLastName())
                     .fullName(user.getFullName())
                     .phone(user.getPhone())
-                    .isGoogleUser(user.isGoogleUser())
-                    .googleId(user.getGoogleId())
-                    .facebookId(user.getFacebookId())
-                    .githubId(user.getGithubId())
+                    .provider(user.getProvider().name())
+                    .hasPassword(user.getPassword() != null && !user.getPassword().isEmpty())
                     .build();
-
 
             return new AuthResponse(
                     jwtService.generateAccessToken(user.getUsername(), Collections.emptyMap()),
-                    refreshToken.getToken(),
+                    refreshToken.getId().toString(),
                     profile);
 
         } catch (Exception ex) {
             trackFailedLogin(key, clientIp);
             throw new InvalidCredentialsException("Credenciales inválidas");
-        }
-    }
-
-    private void trackFailedLogin(String key, String clientIp) {
-        int attemptsUser = loginAttempts.getOrDefault(key, 0) + 1;
-        loginAttempts.put(key, attemptsUser);
-        if (attemptsUser >= MAX_ATTEMPTS_USER) {
-            blockedUntil.put(key, System.currentTimeMillis() + BLOCK_TIME_USER);
-            loginAttempts.remove(key);
-        }
-
-        int attemptsIp = ipLoginAttempts.getOrDefault(clientIp, 0) + 1;
-        ipLoginAttempts.put(clientIp, attemptsIp);
-        if (attemptsIp >= MAX_ATTEMPTS_IP) {
-            ipBlockedUntil.put(clientIp, System.currentTimeMillis() + BLOCK_TIME_IP);
-            ipLoginAttempts.remove(clientIp);
         }
     }
 
@@ -208,7 +187,8 @@ public class AuthService {
 
         String newAccessToken = jwtService.generateAccessToken(user.getUsername(), Collections.emptyMap());
         refreshTokenRepository.delete(refreshToken);
-        RefreshToken newRefreshToken = createRefreshToken(user);
+
+        RefreshToken newRefreshToken = createRefreshToken(user, clientIp, userAgent);
 
         Set<String> roles = user.getRoles().stream()
                 .map(Role::getName)
@@ -223,24 +203,16 @@ public class AuthService {
                 .lastName(user.getLastName())
                 .fullName(user.getFullName())
                 .phone(user.getPhone())
-                .isGoogleUser(user.isGoogleUser())
-                .googleId(user.getGoogleId())
-                .facebookId(user.getFacebookId())
-                .githubId(user.getGithubId())
+                .provider(user.getProvider().name())
+                .hasPassword(user.getPassword() != null && !user.getPassword().isEmpty())
                 .build();
 
-        return new AuthResponse(newAccessToken, newRefreshToken.getToken(), profile);
+        return new AuthResponse(
+                newAccessToken,
+                newRefreshToken.getId().toString(),
+                profile);
     }
 
-    @Transactional
-    public void logout(String refreshTokenStr, String accessToken, String clientIp, String userAgent) {
-        refreshTokenRepository.deleteByToken(refreshTokenStr);
-
-        long expirationMillis = jwtService.getExpirationMillis(accessToken);
-        String username = jwtService.extractUsername(accessToken);
-
-        tokenBlacklistService.blacklistToken(accessToken, username, "logout", expirationMillis, clientIp, userAgent);
-    }
 
     @Transactional
     public void logoutAll(String accessToken, String clientIp, String userAgent) {
@@ -260,11 +232,26 @@ public class AuthService {
     }
 
     @Transactional
-    private RefreshToken createRefreshToken(User user) {
+    public void logout(String sessionId, String accessToken, String clientIp, String userAgent) {
+        RefreshToken refreshToken = refreshTokenRepository.findById(Long.parseLong(sessionId))
+                .orElseThrow(() -> new InvalidRefreshTokenException("Sesión no encontrada"));
+
+        refreshTokenRepository.delete(refreshToken);
+
+        long expirationMillis = jwtService.getExpirationMillis(accessToken);
+        String username = jwtService.extractUsername(accessToken);
+
+        tokenBlacklistService.blacklistToken(accessToken, username, "logout", expirationMillis, clientIp, userAgent);
+    }
+
+    @Transactional
+    private RefreshToken createRefreshToken(User user, String clientIp, String userAgent) {
         RefreshToken refreshToken = RefreshToken.builder()
                 .user(user)
                 .token(jwtService.generateRefreshToken(user.getUsername()))
                 .expiryDate(Instant.now().plusMillis(refreshTokenExpiration))
+                .ip(clientIp)
+                .userAgent(userAgent)
                 .build();
         return refreshTokenRepository.save(refreshToken);
     }
@@ -273,4 +260,42 @@ public class AuthService {
     void revokeAllRefreshTokens(User user) {
         refreshTokenRepository.deleteAllByUser(user);
     }
+
+    @Transactional(readOnly = true)
+    public List<UserSessionResponse> getUserSessions(User user, String currentSessionId) {
+        return refreshTokenRepository.findAllByUser(user).stream()
+                .filter(rt -> !rt.getId().toString().equals(currentSessionId))
+                .map(rt -> new UserSessionResponse(
+                        rt.getId().toString(),
+                        rt.getExpiryDate(),
+                        rt.getIp(),
+                        rt.getUserAgent()
+                ))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<RefreshToken> getRefreshTokenByAccessToken(String accessToken) {
+        String username = jwtService.extractUsername(accessToken);
+        List<RefreshToken> tokens = refreshTokenRepository.findAllByUser(userRepository.findByUsername(username).get());
+        return tokens.stream().max(Comparator.comparing(RefreshToken::getExpiryDate));
+    }
+
+    private void trackFailedLogin(String key, String clientIp) {
+        int attemptsUser = loginAttempts.getOrDefault(key, 0) + 1;
+        loginAttempts.put(key, attemptsUser);
+        if (attemptsUser >= MAX_ATTEMPTS_USER) {
+            blockedUntil.put(key, System.currentTimeMillis() + BLOCK_TIME_USER);
+            loginAttempts.remove(key);
+        }
+
+        int attemptsIp = ipLoginAttempts.getOrDefault(clientIp, 0) + 1;
+        ipLoginAttempts.put(clientIp, attemptsIp);
+        if (attemptsIp >= MAX_ATTEMPTS_IP) {
+            ipBlockedUntil.put(clientIp, System.currentTimeMillis() + BLOCK_TIME_IP);
+            ipLoginAttempts.remove(clientIp);
+        }
+    }
+
+
 }

@@ -1,10 +1,9 @@
 package com.sanisidro.restaurante.features.notifications.controller;
 
-import com.sanisidro.restaurante.core.email.service.EmailService;
+import com.sanisidro.restaurante.core.security.dto.ApiResponse;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.features.notifications.dto.ContactNotificationEvent;
 import com.sanisidro.restaurante.features.notifications.kafka.NotificationProducer;
-import com.sanisidro.restaurante.features.notifications.services.EmailNotificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,23 +19,37 @@ import org.springframework.web.bind.annotation.RestController;
 public class NotificationController {
 
     private final NotificationProducer notificationProducer;
-    private final EmailNotificationService emailNotificationService;
 
     @PostMapping
-    public ResponseEntity<String> sendContact(
+    public ResponseEntity<ApiResponse<String>> sendContact(
             @Valid @RequestBody ContactNotificationEvent contact,
             @AuthenticationPrincipal User user
     ) {
+        String senderName;
+        String senderEmail;
+
+        if (user != null) {
+            senderName = user.getFullName();
+            senderEmail = user.getEmail();
+        } else {
+            if (contact.getName() == null || contact.getEmail() == null) {
+                return ResponseEntity.badRequest().body(
+                        new ApiResponse<>(false, "Nombre y email son obligatorios para usuarios anónimos", null)
+                );
+            }
+            senderName = contact.getName();
+            senderEmail = contact.getEmail();
+        }
+
         ContactNotificationEvent event = ContactNotificationEvent.builder()
-                .userId(user.getId())
+                .userId(user != null ? user.getId() : null)
                 .subject(contact.getSubject())
-                .message("Mensaje de " + user.getFullName() + " (" + user.getEmail() + "):\n\n" + contact.getMessage())
+                .message("Mensaje de " + senderName + " (" + senderEmail + "):\n\n" + contact.getMessage())
                 .actionUrl(contact.getActionUrl())
                 .build();
 
-//        notificationProducer.send("notifications", event);
-        emailNotificationService.send(event);
+        notificationProducer.send("notifications", event);
 
-        return ResponseEntity.ok("Mensaje enviado correctamente. Gracias por contactarnos!");
+        return ResponseEntity.ok(new ApiResponse<>(true, "Mensaje enviado correctamente. Gracias por contactarnos!", null));
     }
 }

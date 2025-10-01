@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.core.security.controller;
 
+import com.sanisidro.restaurante.core.security.dto.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -9,11 +10,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sanisidro.restaurante.core.exceptions.InvalidVerificationCodeException;
-import com.sanisidro.restaurante.core.security.dto.ApiResponse;
-import com.sanisidro.restaurante.core.security.dto.AuthResponse;
-import com.sanisidro.restaurante.core.security.dto.LoginRequest;
-import com.sanisidro.restaurante.core.security.dto.RefreshRequest;
-import com.sanisidro.restaurante.core.security.dto.RegisterRequest;
 import com.sanisidro.restaurante.core.security.service.AuthService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,8 +38,7 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
 
-        String clientIp = httpRequest.getRemoteAddr();
-        AuthResponse authResponse = authService.login(request, clientIp);
+        AuthResponse authResponse = authService.login(request, httpRequest);
         return ResponseEntity.ok(new ApiResponse<>(true, "Login exitoso", authResponse));
     }
 
@@ -69,7 +64,7 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Object>> logout(
-            @Valid @RequestBody RefreshRequest request,
+            @Valid @RequestBody SessionLogoutRequest request,
             HttpServletRequest httpRequest) {
 
         String authHeader = httpRequest.getHeader("Authorization");
@@ -82,9 +77,11 @@ public class AuthController {
         String clientIp = httpRequest.getRemoteAddr();
         String userAgent = httpRequest.getHeader("User-Agent");
 
-        authService.logout(request.getRefreshToken(), accessToken, clientIp, userAgent);
+        authService.logout(request.getSessionId(), accessToken, clientIp, userAgent);
+
         return ResponseEntity.ok(new ApiResponse<>(true, "Logout exitoso", null));
     }
+
 
     @PostMapping("/logout-all")
     public ResponseEntity<ApiResponse<Object>> logoutAll(HttpServletRequest httpRequest) {

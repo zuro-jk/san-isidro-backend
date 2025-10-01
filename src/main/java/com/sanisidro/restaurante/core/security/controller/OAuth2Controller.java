@@ -1,13 +1,9 @@
 package com.sanisidro.restaurante.core.security.controller;
 
-import com.sanisidro.restaurante.core.security.dto.ApiResponse;
-import com.sanisidro.restaurante.core.security.dto.RefreshRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -24,17 +20,15 @@ public class OAuth2Controller {
             HttpServletResponse response
     ) throws IOException {
         if ("popup".equalsIgnoreCase(mode)) {
-            // Modo popup con postMessage
             String html = "<html><body><script>" +
                     "window.opener.postMessage({ accessToken: '" + token + "' }, 'http://localhost:4200');" +
                     "window.close();" +
                     "</script></body></html>";
             response.setContentType("text/html");
             response.getWriter().write(html);
-            return null; // ya respondió con HTML
+            return null;
         }
 
-        // Modo JSON directo
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Login successful",

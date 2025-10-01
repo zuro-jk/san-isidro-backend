@@ -21,8 +21,8 @@ public abstract class Notification {
     @Column(name = "notification_id")
     private Long id;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    @ManyToOne(optional = true, fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = true)
     private User user;
 
     @Column(name = "sent_at")
@@ -30,6 +30,6 @@ public abstract class Notification {
 
     @Column(name = "status", length = 50, nullable = false)
     @Enumerated(EnumType.STRING)
-    private NotificationStatus status;
+    private NotificationStatus status = NotificationStatus.PENDING;
 
 }

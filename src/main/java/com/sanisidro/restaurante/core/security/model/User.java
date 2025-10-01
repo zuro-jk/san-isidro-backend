@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.core.security.model;
 
+import com.sanisidro.restaurante.core.security.enums.AuthProvider;
 import com.sanisidro.restaurante.features.employees.model.Position;
 import jakarta.persistence.*;
 import lombok.*;
@@ -65,8 +66,9 @@ public class User implements UserDetails {
     @Column(unique = true)
     private String githubId;
 
-    @Column
-    private boolean isGoogleUser = false;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AuthProvider provider = AuthProvider.LOCAL;
 
     @Builder.Default
     @ManyToMany(fetch = FetchType.EAGER)
