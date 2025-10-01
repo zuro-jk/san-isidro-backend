@@ -83,11 +83,8 @@ public class OrderService {
         return mapToResponse(order, lang);
     }
 
-    public List<OrderResponse> getOrdersForCurrentUser(String lang) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User currentUser = (User) authentication.getPrincipal();
-
-        Customer customer = customerRepository.findByUserId(currentUser.getId())
+    public List<OrderResponse> getOrdersForCurrentUser(User user, String lang) {
+        Customer customer = customerRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new EntityNotFoundException(
                         "Cliente no encontrado para el usuario autenticado"));
 
