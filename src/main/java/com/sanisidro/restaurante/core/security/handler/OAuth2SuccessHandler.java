@@ -75,7 +75,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             </script></body></html>
             """.formatted(
                 authResponse.getAccessToken(),
-                authResponse.getRefreshToken(),
+                authResponse.getSessionId(),
                 objectMapper.writeValueAsString(authResponse.getUser())
         );
 

@@ -4,14 +4,12 @@ import com.sanisidro.restaurante.core.email.dto.request.EmailMessageRequest;
 import com.sanisidro.restaurante.core.email.service.EmailService;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
-import com.sanisidro.restaurante.features.notifications.dto.EmailVerificationEvent;
-import com.sanisidro.restaurante.features.notifications.dto.NotifiableEvent;
-import com.sanisidro.restaurante.features.notifications.dto.OrderNotificationEvent;
-import com.sanisidro.restaurante.features.notifications.dto.ReservationNotificationEvent;
+import com.sanisidro.restaurante.features.notifications.dto.*;
 import com.sanisidro.restaurante.features.notifications.enums.NotificationStatus;
 import com.sanisidro.restaurante.features.notifications.metrics.NotificationMetricsService;
 import com.sanisidro.restaurante.features.notifications.model.EmailNotification;
 import com.sanisidro.restaurante.features.notifications.repository.EmailNotificationRepository;
+import com.sanisidro.restaurante.features.notifications.templates.ContactEmailTemplateBuilder;
 import com.sanisidro.restaurante.features.notifications.templates.EmailTemplateBuilder;
 import com.sanisidro.restaurante.features.notifications.templates.EmailTemplateBuilder.OrderProduct;
 import com.sanisidro.restaurante.features.notifications.templates.EmailVerificationTemplateBuilder;
@@ -125,11 +123,22 @@ public class EmailNotificationService implements NotificationChannel {
             );
 
         } else if (event instanceof ReservationNotificationEvent reservationEvent) {
-            return ReservationEmailTemplateBuilder.buildReservationConfirmationEmail(reservationEvent);
+            return ReservationEmailTemplateBuilder.buildReservationConfirmationEmail(
+                    reservationEvent,
+                    frontendUrl
+            );
 
         } else if (event instanceof EmailVerificationEvent verificationEvent) {
             String actionUrl = verificationEvent.getActionUrl();
             return EmailVerificationTemplateBuilder.buildVerificationEmail(verificationEvent, recipientName, actionUrl);
+        } else if (event instanceof ContactNotificationEvent contactEvent) {
+            return ContactEmailTemplateBuilder.buildContactEmail(
+                    recipientName,                          // senderName
+                    user != null ? user.getEmail() : "N/A", // senderEmail
+                    contactEvent.getSubject(),              // subject
+                    contactEvent.getMessage(),              // message
+                    contactEvent.getActionUrl()             // actionUrl
+            );
         } else {
             return EmailTemplateBuilder.buildPromotionEmail(
                     event.getSubject(),

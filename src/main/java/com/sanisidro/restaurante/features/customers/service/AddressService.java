@@ -62,11 +62,8 @@ public class AddressService {
     }
 
     @Transactional(readOnly = true)
-    public PagedResponse<AddressResponse> getAddressesByCustomerAuth(Pageable pageable) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User currentUser = (User) authentication.getPrincipal();
-
-        Customer customer = customerRepository.findByUserId(currentUser.getId())
+    public PagedResponse<AddressResponse> getAddressesByCustomerAuth(User user, Pageable pageable) {
+        Customer customer = customerRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado para el usuario autenticado"));
 
         Page<Address> page = addressRepository.findByCustomerId(customer.getId(), pageable);

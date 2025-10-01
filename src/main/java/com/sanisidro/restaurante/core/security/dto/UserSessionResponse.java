@@ -1,14 +1,15 @@
 package com.sanisidro.restaurante.core.security.dto;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
+
+import java.time.Instant;
 
 @Data
 @AllArgsConstructor
-@Builder
-public class AuthResponse {
-    private String accessToken;
+public class UserSessionResponse {
     private String sessionId;
-    private UserProfileResponse user;
+    private Instant expiryDate;
+    private String ip;
+    private String userAgent;
 }

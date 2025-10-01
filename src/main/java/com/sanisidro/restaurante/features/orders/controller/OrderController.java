@@ -45,6 +45,13 @@ public class OrderController {
         return ResponseEntity.ok(new ApiResponse<>(true, "Orden obtenida correctamente", order));
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<List<OrderResponse>>> getMyOrders(
+            @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang) {
+        List<OrderResponse> orders = orderService.getOrdersForCurrentUser(lang);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Órdenes del usuario autenticado obtenidas correctamente", orders));
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<OrderResponse>> create(
             @Valid @RequestBody OrderRequest request,

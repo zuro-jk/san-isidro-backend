@@ -1,8 +1,7 @@
 package com.sanisidro.restaurante.features.notifications.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import com.sanisidro.restaurante.core.security.model.User;
+import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 

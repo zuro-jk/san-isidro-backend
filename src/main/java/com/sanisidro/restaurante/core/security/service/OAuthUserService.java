@@ -6,6 +6,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.sanisidro.restaurante.core.security.enums.AuthProvider;
+import com.sanisidro.restaurante.features.customers.model.Customer;
+import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +36,7 @@ public class OAuthUserService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final CustomerRepository customerRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtService jwtService;
 
@@ -59,7 +63,7 @@ public class OAuthUserService {
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
-                .refreshToken(refreshTokenEntity.getToken())
+                .sessionId(refreshTokenEntity.getId().toString())
                 .user(userProfile)
                 .build();
     }
@@ -74,7 +78,7 @@ public class OAuthUserService {
     }
 
     private User createUserFromOAuth(String provider, String providerId, String email, String firstName,
-            String lastName, Boolean emailVerified) {
+                                     String lastName, Boolean emailVerified) {
         User user = new User();
         user.setEmail(email);
         user.setUsername(email);
@@ -96,13 +100,20 @@ public class OAuthUserService {
         user.setEmailVerified(emailVerified != null && emailVerified);
 
         switch (provider.toLowerCase()) {
-            case "google" -> {
-                user.setGoogleUser(true);
-                user.setGoogleId(providerId);
+            case "google" -> user.setProvider(AuthProvider.GOOGLE);
+            case "facebook" -> user.setProvider(AuthProvider.FACEBOOK);
+            case "github" -> user.setProvider(AuthProvider.GITHUB);
+            default -> {
+                user.setProvider(AuthProvider.LOCAL);
+                log.warn("Provider OAuth2 no soportado: {}", provider);
             }
-            case "facebook" -> user.setFacebookId(providerId);
-            case "github" -> user.setGithubId(providerId);
-            default -> log.warn("Provider OAuth2 no soportado: {}", provider);
+        }
+
+        switch (user.getProvider()) {
+            case GOOGLE -> user.setGoogleId(providerId);
+            case FACEBOOK -> user.setFacebookId(providerId);
+            case GITHUB -> user.setGithubId(providerId);
+            default -> {}
         }
 
         Role clientRole = roleRepository.findByName("ROLE_CLIENT")
@@ -110,7 +121,15 @@ public class OAuthUserService {
         user.setRoles(Set.of(clientRole));
 
         log.info("Creando nuevo usuario OAuth2: {} (provider={})", email, provider);
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        Customer customer = Customer.builder()
+                .points(10)
+                .user(savedUser)
+                .build();
+        customerRepository.save(customer);
+
+        return savedUser;
     }
 
     private RefreshToken createRefreshToken(User user) {

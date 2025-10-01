@@ -6,13 +6,15 @@ import java.time.format.DateTimeFormatter;
 
 public class ReservationEmailTemplateBuilder {
 
-    public static String buildReservationConfirmationEmail(ReservationNotificationEvent event) {
-        // Formateo de la fecha
+    public static String buildReservationConfirmationEmail(ReservationNotificationEvent event, String frontendUrl) {
         String date = event.getReservationDate() != null
                 ? event.getReservationDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
                 : "Fecha no disponible";
 
         String time = event.getReservationTime() != null ? event.getReservationTime() : "Hora no disponible";
+
+        // 🔗 Construcción del link hacia tu frontend
+        String actionUrl = frontendUrl + "/reservations/" + event.getReservationId();
 
         return """
                 <html>
@@ -70,7 +72,7 @@ public class ReservationEmailTemplateBuilder {
                 time,
                 event.getNumberOfPeople(),
                 escapeHtml(event.getTableName()),
-                event.getActionUrl() != null ? event.getActionUrl() : "#"
+                actionUrl
         );
     }
 

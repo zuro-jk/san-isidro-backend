@@ -2,6 +2,7 @@ package com.sanisidro.restaurante.features.customers.controller;
 
 import com.sanisidro.restaurante.core.dto.response.PagedResponse;
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
+import com.sanisidro.restaurante.features.customers.dto.reservation.request.AuthenticatedReservationRequest;
 import com.sanisidro.restaurante.features.customers.dto.reservation.request.ReservationRequest;
 import com.sanisidro.restaurante.features.customers.dto.reservation.response.ReservationResponse;
 import com.sanisidro.restaurante.features.customers.service.ReservationService;
@@ -19,6 +20,18 @@ import jakarta.validation.Valid;
 public class ReservationController {
 
     private final ReservationService reservationService;
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<PagedResponse<ReservationResponse>>> getMyReservations(Pageable pageable) {
+        PagedResponse<ReservationResponse> result = reservationService.getReservationsForAuthenticatedUser(pageable);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Reservas del usuario autenticado obtenidas correctamente", result));
+    }
+
+    @GetMapping()
+    public ResponseEntity<ApiResponse<PagedResponse<ReservationResponse>>> getAllReservations(Pageable pageable) {
+        PagedResponse<ReservationResponse> result = reservationService.getAllReservations(pageable);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Todas las reservas obtenidas correctamente", result));
+    }
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ReservationResponse>> getReservation(@PathVariable Long id) {
@@ -39,6 +52,11 @@ public class ReservationController {
     public ResponseEntity<ApiResponse<ReservationResponse>> createReservation(@Valid @RequestBody ReservationRequest dto) {
         ReservationResponse reservation = reservationService.createReservation(dto);
         return new ResponseEntity<>(new ApiResponse<>(true, "Reserva creada correctamente", reservation), HttpStatus.CREATED);
+    }
+
+    @PostMapping("/me")
+    public ResponseEntity<ReservationResponse> createMyReservation(@Valid @RequestBody AuthenticatedReservationRequest dto) {
+        return ResponseEntity.ok(reservationService.createReservationForAuthenticatedUser(dto));
     }
 
     @PostMapping("/walkin/manual")

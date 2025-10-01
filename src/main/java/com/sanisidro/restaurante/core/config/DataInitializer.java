@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.core.config;
 
+import com.sanisidro.restaurante.core.security.enums.AuthProvider;
 import com.sanisidro.restaurante.core.security.model.PaymentProfile;
 import com.sanisidro.restaurante.core.security.model.Role;
 import com.sanisidro.restaurante.core.security.model.User;
@@ -125,6 +126,7 @@ public class DataInitializer implements CommandLineRunner {
                     .lastName("Luna")
                     .password(passwordEncoder.encode("admin123"))
                     .roles(Collections.singleton(adminRole))
+                    .provider(AuthProvider.LOCAL)
                     .enabled(true)
                     .build();
 
@@ -785,6 +787,7 @@ public class DataInitializer implements CommandLineRunner {
                     .password(passwordEncoder.encode("password123"))
                     .roles(Set.of(supplierRole))
                     .enabled(true)
+                    .provider(AuthProvider.LOCAL)
                     .build();
             userRepository.save(sanFernandoUser);
         }
@@ -798,6 +801,7 @@ public class DataInitializer implements CommandLineRunner {
                     .password(passwordEncoder.encode("password123"))
                     .roles(Set.of(supplierRole))
                     .enabled(true)
+                    .provider(AuthProvider.LOCAL)
                     .build();
             userRepository.save(gloriaUser);
         }
@@ -933,6 +937,7 @@ public class DataInitializer implements CommandLineRunner {
                 .lastName("Perez")
                 .password(passwordEncoder.encode("password123"))
                 .enabled(true)
+                .provider(AuthProvider.LOCAL)
                 .build();
 
         waiterUser.syncRolesWithPosition(waiterPosition);
@@ -944,6 +949,7 @@ public class DataInitializer implements CommandLineRunner {
                 .lastName("Ramirez")
                 .password(passwordEncoder.encode("password123"))
                 .enabled(true)
+                .provider(AuthProvider.LOCAL)
                 .build();
 
         chefUser.syncRolesWithPosition(chefPosition);
@@ -1098,6 +1104,7 @@ public class DataInitializer implements CommandLineRunner {
                 .password(passwordEncoder.encode("password123"))
                 .enabled(true)
                 .roles(Set.of(clientRole))
+                .provider(AuthProvider.LOCAL)
                 .build();
 
         PaymentProfile profile1 = PaymentProfile.builder()
@@ -1115,6 +1122,7 @@ public class DataInitializer implements CommandLineRunner {
                 .password(passwordEncoder.encode("password123"))
                 .enabled(true)
                 .roles(Set.of(clientRole))
+                .provider(AuthProvider.LOCAL)
                 .build();
 
         PaymentProfile profile2 = PaymentProfile.builder()
@@ -1132,6 +1140,7 @@ public class DataInitializer implements CommandLineRunner {
                 .password(passwordEncoder.encode("password123"))
                 .enabled(true)
                 .roles(Set.of(clientRole))
+                .provider(AuthProvider.LOCAL)
                 .build();
 
         PaymentProfile profile3 = PaymentProfile.builder()

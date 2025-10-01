@@ -1,5 +1,6 @@
 package com.sanisidro.restaurante.core.config;
 
+import com.sanisidro.restaurante.core.security.enums.AuthProvider;
 import com.sanisidro.restaurante.core.security.model.User;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -14,8 +15,8 @@ public class CustomDaoAuthenticationProvider extends DaoAuthenticationProvider {
             throws BadCredentialsException {
 
         if (userDetails instanceof User user) {
-            if (user.isGoogleUser()) {
-                throw new BadCredentialsException("Google users cannot login with password");
+            if (user.getPassword() == null || user.getPassword().isEmpty()) {
+                throw new BadCredentialsException("Este usuario no tiene contraseña. Usa OAuth o agrega una contraseña.");
             }
         }
 

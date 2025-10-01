@@ -24,6 +24,8 @@ public class NotificationFacade {
             channelKey = "WEBSOCKET";
         } else if (event instanceof EmailVerificationEvent) {
             channelKey = "EMAIL";
+        } else if (event instanceof ContactNotificationEvent) {
+            channelKey = "EMAIL";
         } else {
             throw new IllegalArgumentException("Evento de notificación no soportado: " + event.getClass().getSimpleName());
         }
