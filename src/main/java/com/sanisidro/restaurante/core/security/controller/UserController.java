@@ -56,7 +56,7 @@ public class UserController {
     }
 
     @PutMapping("/update-profile")
-    public ResponseEntity<ApiResponse<UserProfileResponse>> updateProfile(
+    public ResponseEntity<ApiResponse<UpdateProfileResponse>> updateProfile(
             @AuthenticationPrincipal User user,
             @Valid @RequestBody UpdateProfileRequest request) {
 
@@ -65,7 +65,7 @@ public class UserController {
                     .body(new ApiResponse<>(false, "Usuario no autenticado", null));
         }
 
-        UserProfileResponse updatedUser = userService.updateProfile(user.getUsername(), request);
+        UpdateProfileResponse updatedUser = userService.updateProfile(user.getUsername(), request);
 
         return ResponseEntity.ok(
                 new ApiResponse<>(true, "Perfil actualizado correctamente", updatedUser)

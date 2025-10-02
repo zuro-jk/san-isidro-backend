@@ -37,6 +37,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         String firstName = oauthUser.getAttribute("given_name");
         String lastName = oauthUser.getAttribute("family_name");
         Boolean emailVerified = provider.equalsIgnoreCase("google") ? oauthUser.getAttribute("email_verified") : false;
+        String profileImageUrl = oauthUser.getAttribute("picture");
 
         if (provider.equalsIgnoreCase("google") && (emailVerified == null || !emailVerified)) {
             log.warn("Usuario Google no verificado: {}", email);
@@ -45,15 +46,13 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         }
 
         AuthResponse authResponse = oAuthUserService.processOAuthUser(
-                provider, providerId, email, firstName, lastName, emailVerified
+                provider, providerId, email, firstName, lastName, emailVerified, profileImageUrl
         );
 
         log.info("OAuth2 login successful: provider={}, email={}, providerId={}", provider, email, providerId);
 
-        // Convertimos el usuario a JSON
         String userJson = objectMapper.writeValueAsString(authResponse.getUser());
 
-        // HTML que se renderiza en el popup y envía datos al frontend
         String script = """
             <html><body><script>
                 try {

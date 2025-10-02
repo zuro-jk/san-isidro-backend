@@ -1,6 +1,7 @@
 package com.sanisidro.restaurante.core.security.service;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -291,6 +292,16 @@ public class AuthService {
             }
         }
 
+        LocalDateTime usernameNextChange = null;
+        if (user.getLastUsernameChange() != null) {
+            usernameNextChange = user.getLastUsernameChange().plusDays(7);
+        }
+
+        LocalDateTime emailNextChange = null;
+        if (user.getLastEmailChange() != null) {
+            emailNextChange = user.getLastEmailChange().plusDays(30);
+        }
+
         return UserProfileResponse.builder()
                 .username(user.getUsername())
                 .email(user.getEmail())
@@ -303,6 +314,8 @@ public class AuthService {
                 .provider(user.getProvider().name())
                 .hasPassword(user.getPassword() != null && !user.getPassword().isEmpty())
                 .profileImageUrl(profileImageUrl)
+                .usernameNextChange(usernameNextChange)
+                .emailNextChange(emailNextChange)
                 .build();
     }
 

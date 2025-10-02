@@ -2,12 +2,12 @@ package com.sanisidro.restaurante.core.security.service;
 
 import com.sanisidro.restaurante.core.aws.model.FileMetadata;
 import com.sanisidro.restaurante.core.aws.service.FileService;
+import com.sanisidro.restaurante.core.exceptions.EmailChangeNotAllowedException;
 import com.sanisidro.restaurante.core.exceptions.InvalidPasswordException;
 import com.sanisidro.restaurante.core.exceptions.UserNotFoundException;
-import com.sanisidro.restaurante.core.security.dto.ChanguePasswordRequest;
-import com.sanisidro.restaurante.core.security.dto.UpdateProfileRequest;
-import com.sanisidro.restaurante.core.security.dto.UserProfileResponse;
-import com.sanisidro.restaurante.core.security.dto.UserSessionResponse;
+import com.sanisidro.restaurante.core.exceptions.UsernameChangeNotAllowedException;
+import com.sanisidro.restaurante.core.security.dto.*;
+import com.sanisidro.restaurante.core.security.jwt.JwtService;
 import com.sanisidro.restaurante.core.security.model.RefreshToken;
 import com.sanisidro.restaurante.core.security.model.Role;
 import com.sanisidro.restaurante.core.security.model.User;
@@ -20,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -30,6 +31,7 @@ public class UserService {
 
     private final PasswordEncoder passwordEncoder;
     private final AuthService authService;
+    private final JwtService jwtService;
     private final UserRepository userRepository;
     private final FileService fileService;
 
@@ -43,44 +45,67 @@ public class UserService {
     }
 
     @Transactional
-    public UserProfileResponse updateProfile(String username, UpdateProfileRequest request) {
+    public UpdateProfileResponse updateProfile(String username, UpdateProfileRequest request) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
 
+        boolean loginChanged = false;
 
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setPhone(request.getPhone());
 
         if (!request.getEmail().equals(user.getEmail())) {
-            if (user.getLastEmailChange() != null &&
-                    user.getLastEmailChange().isAfter(LocalDateTime.now().minusDays(30))) {
-                throw new IllegalArgumentException("Solo puedes cambiar tu email cada 30 días");
+            if (user.getLastEmailChange() != null) {
+                LocalDateTime nextAllowedEmailChange = user.getLastEmailChange().plusDays(30);
+                if (LocalDateTime.now().isBefore(nextAllowedEmailChange)) {
+                    long daysLeft = java.time.Duration.between(LocalDateTime.now(), nextAllowedEmailChange).toDays();
+                    throw new EmailChangeNotAllowedException(
+                            "No puedes cambiar tu email aún. Te faltan " + daysLeft + " días.");
+                }
             }
             if (userRepository.existsByEmail(request.getEmail())) {
-                throw new IllegalArgumentException("El email ya está en uso");
+                throw new EmailChangeNotAllowedException("El email ya está en uso");
             }
             user.setEmail(request.getEmail());
             user.setLastEmailChange(LocalDateTime.now());
             user.setEmailVerified(false);
+            loginChanged = true;
         }
 
         if (!request.getUsername().equals(user.getUsername())) {
-            if (user.getLastUsernameChange() != null &&
-                    user.getLastUsernameChange().isAfter(LocalDateTime.now().minusDays(30))) {
-                throw new IllegalArgumentException("Solo puedes cambiar tu username cada 30 días");
+            if (user.getLastUsernameChange() != null) {
+                LocalDateTime nextAllowedUsernameChange = user.getLastUsernameChange().plusDays(7);
+                if (LocalDateTime.now().isBefore(nextAllowedUsernameChange)) {
+                    long daysLeft = java.time.Duration.between(LocalDateTime.now(), nextAllowedUsernameChange).toDays();
+                    throw new UsernameChangeNotAllowedException(
+                            "No puedes cambiar tu username aún. Te faltan " + daysLeft + " días.");
+                }
             }
             if (userRepository.existsByUsername(request.getUsername())) {
-                throw new IllegalArgumentException("El username ya está en uso");
+                throw new UsernameChangeNotAllowedException("El username ya está en uso");
             }
             user.setUsername(request.getUsername());
             user.setLastUsernameChange(LocalDateTime.now());
+            loginChanged = true;
         }
-
 
         userRepository.save(user);
 
-        return getUserByUsername(user.getUsername());
+        UserProfileResponse userProfile = getUserByUsername(user.getUsername());
+
+        String newToken = null;
+        if (loginChanged) {
+            newToken = jwtService.generateAccessToken(
+                    user.getUsername(),
+                    Map.of("roles", user.getRoles().stream().map(Role::getName).toList())
+            );
+        }
+
+        return UpdateProfileResponse.builder()
+                .user(userProfile)
+                .token(newToken)
+                .build();
     }
 
     @Transactional
@@ -138,6 +163,16 @@ public class UserService {
             }
         }
 
+        LocalDateTime usernameNextChange = null;
+        if (user.getLastUsernameChange() != null) {
+            usernameNextChange = user.getLastUsernameChange().plusDays(7);
+        }
+
+        LocalDateTime emailNextChange = null;
+        if (user.getLastEmailChange() != null) {
+            emailNextChange = user.getLastEmailChange().plusDays(30);
+        }
+
         return UserProfileResponse.builder()
                 .username(user.getUsername())
                 .email(user.getEmail())
@@ -150,6 +185,8 @@ public class UserService {
                 .provider(user.getProvider().name())
                 .hasPassword(user.getPassword() != null && !user.getPassword().isEmpty())
                 .profileImageUrl(profileImageUrl)
+                .usernameNextChange(usernameNextChange)
+                .emailNextChange(emailNextChange)
                 .build();
     }
 
