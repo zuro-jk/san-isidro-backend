@@ -3,7 +3,6 @@ package com.sanisidro.restaurante.core.security.handler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sanisidro.restaurante.core.security.dto.AuthResponse;
 import com.sanisidro.restaurante.core.security.service.OAuthUserService;
-import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -27,57 +26,54 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
                                         HttpServletResponse response,
-                                        Authentication authentication)
-            throws IOException, ServletException {
+                                        Authentication authentication) throws IOException {
 
         OAuth2AuthenticationToken oauthToken = (OAuth2AuthenticationToken) authentication;
         String provider = oauthToken.getAuthorizedClientRegistrationId();
         OAuth2User oauthUser = oauthToken.getPrincipal();
 
-        String providerId = switch (provider.toLowerCase()) {
-            case "google" -> oauthUser.getAttribute("sub");
-            case "facebook" -> oauthUser.getAttribute("id");
-            case "github" -> oauthUser.getAttribute("id");
-            default -> null;
-        };
-
+        String providerId = provider.equalsIgnoreCase("google") ? oauthUser.getAttribute("sub") : oauthUser.getAttribute("id");
         String email = oauthUser.getAttribute("email");
         String firstName = oauthUser.getAttribute("given_name");
         String lastName = oauthUser.getAttribute("family_name");
+        Boolean emailVerified = provider.equalsIgnoreCase("google") ? oauthUser.getAttribute("email_verified") : false;
 
-        Boolean emailVerified = provider.equals("google") ? oauthUser.getAttribute("email_verified") : false;
-
-        if (provider.equals("google") && (emailVerified == null || !emailVerified)) {
-            log.warn("OAuth2 login failed for Google user (email not verified): {}", email);
+        if (provider.equalsIgnoreCase("google") && (emailVerified == null || !emailVerified)) {
+            log.warn("Usuario Google no verificado: {}", email);
             response.sendRedirect("/loginFailure?error=email_not_verified");
             return;
         }
 
-        log.info("OAuth2 login success: provider={}, email={}, providerId={}", provider, email, providerId);
-
-        // Procesar usuario y generar respuesta con tokens
         AuthResponse authResponse = oAuthUserService.processOAuthUser(
                 provider, providerId, email, firstName, lastName, emailVerified
         );
 
-        // Enviar datos al frontend via ventana emergente
+        log.info("OAuth2 login successful: provider={}, email={}, providerId={}", provider, email, providerId);
+
+        // Convertimos el usuario a JSON
+        String userJson = objectMapper.writeValueAsString(authResponse.getUser());
+
+        // HTML que se renderiza en el popup y envía datos al frontend
         String script = """
             <html><body><script>
-                window.opener.postMessage(
-                    {
-                        accessToken: '%s',
-                        refreshToken: '%s',
-                        user: %s
-                    },
-                    'http://localhost:4200'
-                );
+                try {
+                    console.log('Enviando datos al frontend...');
+                    window.opener.postMessage(
+                        {
+                            success: true,
+                            accessToken: '%s',
+                            refreshToken: '%s',
+                            user: %s
+                        },
+                        'http://localhost:4200'
+                    );
+                    console.log('Datos enviados correctamente');
+                } catch(e) {
+                    console.error('Error enviando postMessage:', e);
+                }
                 window.close();
             </script></body></html>
-            """.formatted(
-                authResponse.getAccessToken(),
-                authResponse.getSessionId(),
-                objectMapper.writeValueAsString(authResponse.getUser())
-        );
+        """.formatted(authResponse.getAccessToken(), authResponse.getSessionId(), userJson);
 
         response.setContentType("text/html");
         response.getWriter().write(script);

@@ -1,5 +1,7 @@
 package com.sanisidro.restaurante.core.security.service;
 
+import com.sanisidro.restaurante.core.aws.model.FileMetadata;
+import com.sanisidro.restaurante.core.aws.service.FileService;
 import com.sanisidro.restaurante.core.exceptions.InvalidPasswordException;
 import com.sanisidro.restaurante.core.exceptions.UserNotFoundException;
 import com.sanisidro.restaurante.core.security.dto.ChanguePasswordRequest;
@@ -14,7 +16,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -27,29 +31,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final AuthService authService;
     private final UserRepository userRepository;
-
-
-    public UserProfileResponse getUserByUsername(String username) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
-
-        Set<String> roles = user.getRoles().stream()
-                .map(Role::getName)
-                .collect(Collectors.toSet());
-
-        return UserProfileResponse.builder()
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .enabled(user.isEnabled())
-                .roles(roles)
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .fullName(user.getFullName())
-                .phone(user.getPhone())
-                .provider(user.getProvider().name())
-                .hasPassword(user.getPassword() != null && !user.getPassword().isEmpty())
-                .build();
-    }
+    private final FileService fileService;
 
     @Transactional(readOnly = true)
     public List<UserSessionResponse> getSessions(User user, String currentAccessToken) {
@@ -65,15 +47,56 @@ public class UserService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
 
+
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
-        user.setEmail(request.getEmail());
-        user.setUsername(request.getUsername());
         user.setPhone(request.getPhone());
+
+        if (!request.getEmail().equals(user.getEmail())) {
+            if (user.getLastEmailChange() != null &&
+                    user.getLastEmailChange().isAfter(LocalDateTime.now().minusDays(30))) {
+                throw new IllegalArgumentException("Solo puedes cambiar tu email cada 30 días");
+            }
+            if (userRepository.existsByEmail(request.getEmail())) {
+                throw new IllegalArgumentException("El email ya está en uso");
+            }
+            user.setEmail(request.getEmail());
+            user.setLastEmailChange(LocalDateTime.now());
+            user.setEmailVerified(false);
+        }
+
+        if (!request.getUsername().equals(user.getUsername())) {
+            if (user.getLastUsernameChange() != null &&
+                    user.getLastUsernameChange().isAfter(LocalDateTime.now().minusDays(30))) {
+                throw new IllegalArgumentException("Solo puedes cambiar tu username cada 30 días");
+            }
+            if (userRepository.existsByUsername(request.getUsername())) {
+                throw new IllegalArgumentException("El username ya está en uso");
+            }
+            user.setUsername(request.getUsername());
+            user.setLastUsernameChange(LocalDateTime.now());
+        }
+
 
         userRepository.save(user);
 
         return getUserByUsername(user.getUsername());
+    }
+
+    @Transactional
+    public UserProfileResponse updateProfileImage(User user, MultipartFile file) {
+        FileMetadata metadata = fileService.uploadFile(file, "profiles");
+
+        if (user.getProfileImageId() != null) {
+            fileService.deleteFile(user.getProfileImageId());
+        }
+
+        user.setProfileImageId(metadata.getId());
+        userRepository.save(user);
+
+        UserProfileResponse profile = getUserByUsername(user.getUsername());
+        profile.setProfileImageUrl(metadata.getUrl());
+        return profile;
     }
 
     @Transactional
@@ -97,5 +120,39 @@ public class UserService {
         userRepository.save(user);
         authService.revokeAllRefreshTokens(user);
     }
+
+    public UserProfileResponse getUserByUsername(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
+
+        Set<String> roles = user.getRoles().stream()
+                .map(Role::getName)
+                .collect(Collectors.toSet());
+
+        String profileImageUrl = null;
+        if (user.getProfileImageId() != null) {
+            try {
+                profileImageUrl = fileService.getFileUrl(user.getProfileImageId());
+            } catch (Exception e) {
+                profileImageUrl = null;
+            }
+        }
+
+        return UserProfileResponse.builder()
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .enabled(user.isEnabled())
+                .roles(roles)
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .fullName(user.getFullName())
+                .phone(user.getPhone())
+                .provider(user.getProvider().name())
+                .hasPassword(user.getPassword() != null && !user.getPassword().isEmpty())
+                .profileImageUrl(profileImageUrl)
+                .build();
+    }
+
+
 
 }

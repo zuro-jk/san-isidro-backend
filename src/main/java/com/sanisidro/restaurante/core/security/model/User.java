@@ -7,6 +7,7 @@ import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
@@ -42,6 +43,15 @@ public class User implements UserDetails {
 
     @Column
     private String phone;
+
+    @Column(name = "last_username_change")
+    private LocalDateTime lastUsernameChange;
+
+    @Column(name = "last_email_change")
+    private LocalDateTime lastEmailChange;
+
+    @Column(name = "profile_image_id")
+    private Long profileImageId;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<UserDocument> documents = new HashSet<>();

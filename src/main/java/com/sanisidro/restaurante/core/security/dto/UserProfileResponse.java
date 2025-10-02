@@ -22,5 +22,6 @@ public class UserProfileResponse {
     private String phone;
     private String provider;
     private boolean hasPassword;
+    private String profileImageUrl;
 
 }

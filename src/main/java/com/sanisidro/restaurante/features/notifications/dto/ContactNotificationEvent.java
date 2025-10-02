@@ -10,7 +10,7 @@ import lombok.*;
 @Builder
 public class ContactNotificationEvent implements NotifiableEvent {
 
-    private Long userId; // puede ser null para anónimo
+    private Long userId;
 
     @NotBlank(message = "El asunto es obligatorio")
     private String subject;
@@ -22,6 +22,7 @@ public class ContactNotificationEvent implements NotifiableEvent {
 
     private String name;
     private String email;
+    private String phone;
 
     @Override
     public Long getUserId() { return userId; }

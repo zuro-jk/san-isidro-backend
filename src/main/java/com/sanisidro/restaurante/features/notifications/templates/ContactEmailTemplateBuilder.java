@@ -2,7 +2,7 @@ package com.sanisidro.restaurante.features.notifications.templates;
 
 public class ContactEmailTemplateBuilder {
 
-    public static String buildContactEmail(String senderName, String senderEmail, String subject, String message, String actionUrl) {
+    public static String buildContactEmail(String senderName, String senderEmail, String senderPhone, String subject, String message, String actionUrl) {
         String actionButton = "";
         if (actionUrl != null && !actionUrl.isBlank()) {
             actionButton = """
@@ -26,6 +26,7 @@ public class ContactEmailTemplateBuilder {
                   <div style="padding:20px; background-color:#f3f4f6; border-bottom:1px solid #e5e7eb;">
                     <p><strong>Nombre:</strong> %s</p>
                     <p><strong>Email:</strong> %s</p>
+                    <p><strong>Teléfono:</strong> %s</p>
                     <p><strong>Asunto:</strong> %s</p>
                   </div>
 
@@ -46,6 +47,7 @@ public class ContactEmailTemplateBuilder {
         """.formatted(
                 escapeHtml(senderName),
                 escapeHtml(senderEmail),
+                escapeHtml(senderPhone != null && !senderPhone.isBlank() ? senderPhone : "N/A"),
                 escapeHtml(subject),
                 escapeHtml(message),
                 actionButton
@@ -54,6 +56,8 @@ public class ContactEmailTemplateBuilder {
 
     private static String escapeHtml(String input) {
         if (input == null) return "";
-        return input.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        return input.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
     }
 }

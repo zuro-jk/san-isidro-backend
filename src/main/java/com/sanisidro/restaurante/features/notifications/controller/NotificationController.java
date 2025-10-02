@@ -27,10 +27,13 @@ public class NotificationController {
     ) {
         String senderName;
         String senderEmail;
+        String senderPhone = contact.getPhone(); // NUEVO: phone opcional
 
+        // Determinar datos del remitente
         if (user != null) {
             senderName = user.getFullName();
             senderEmail = user.getEmail();
+            senderPhone = user.getPhone(); // opcional si tu User tiene phone
         } else {
             if (contact.getName() == null || contact.getEmail() == null) {
                 return ResponseEntity.badRequest().body(
@@ -41,15 +44,29 @@ public class NotificationController {
             senderEmail = contact.getEmail();
         }
 
+        String messageWithPhone = buildMessageWithPhone(senderName, senderEmail, contact.getMessage(), senderPhone);
+
         ContactNotificationEvent event = ContactNotificationEvent.builder()
                 .userId(user != null ? user.getId() : null)
                 .subject(contact.getSubject())
-                .message("Mensaje de " + senderName + " (" + senderEmail + "):\n\n" + contact.getMessage())
+                .message(messageWithPhone)
                 .actionUrl(contact.getActionUrl())
+                .name(senderName)
+                .email(senderEmail)
+                .phone(senderPhone)
                 .build();
 
+        // Enviar a Kafka
         notificationProducer.send("notifications", event);
 
         return ResponseEntity.ok(new ApiResponse<>(true, "Mensaje enviado correctamente. Gracias por contactarnos!", null));
+    }
+
+    /**
+     * Construye el mensaje incluyendo el teléfono si se proporciona.
+     */
+    private String buildMessageWithPhone(String name, String email, String message, String phone) {
+        String phoneLine = (phone != null && !phone.isBlank()) ? "\nTeléfono: " + phone : "";
+        return "Mensaje de " + name + " (" + email + ")" + phoneLine + ":\n\n" + message;
     }
 }

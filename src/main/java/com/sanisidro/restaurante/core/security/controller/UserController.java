@@ -12,6 +12,7 @@ import com.sanisidro.restaurante.core.security.service.UserService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -69,6 +70,21 @@ public class UserController {
         return ResponseEntity.ok(
                 new ApiResponse<>(true, "Perfil actualizado correctamente", updatedUser)
         );
+    }
+
+    @PutMapping("/profile-image")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> updateProfileImage(
+            @AuthenticationPrincipal User user,
+            @RequestParam("file") MultipartFile file) {
+
+        if (user == null) {
+            return ResponseEntity.status(401)
+                    .body(new ApiResponse<>(false, "Usuario no autenticado", null));
+        }
+
+        UserProfileResponse updatedProfile = userService.updateProfileImage(user, file);
+
+        return ResponseEntity.ok(new ApiResponse<>(true, "Imagen de perfil actualizada", updatedProfile));
     }
 
     @PutMapping("/change-password")

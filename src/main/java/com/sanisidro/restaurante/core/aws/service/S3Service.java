@@ -25,7 +25,6 @@ public class S3Service {
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
 
-    // Subir MultipartFile directamente
     public String uploadFile(MultipartFile file, String folder) {
         try {
             String extension = "";
@@ -53,7 +52,6 @@ public class S3Service {
         }
     }
 
-    // Subir desde un archivo temporal
     public String uploadFile(File file, String folder, String contentType) {
         try (InputStream inputStream = new FileInputStream(file)) {
             String extension = "";

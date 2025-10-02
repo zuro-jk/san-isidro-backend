@@ -15,6 +15,7 @@ public class UpdateProfileRequest {
     private String lastName;
 
     @Email(message = "El correo no es válido")
+    @NotBlank(message = "El correo no puede estar vacío")
     private String email;
 
     @NotBlank(message = "El nombre de usuario no puede estar vacío")

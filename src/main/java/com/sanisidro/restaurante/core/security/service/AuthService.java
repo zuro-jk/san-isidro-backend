@@ -5,6 +5,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import com.sanisidro.restaurante.core.aws.service.FileService;
 import com.sanisidro.restaurante.core.security.dto.*;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,6 +52,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final FileService fileService;
 
     private final NotificationProducer notificationProducer;
 
@@ -97,18 +99,7 @@ public class AuthService {
                     .map(Role::getName)
                     .collect(Collectors.toSet());
 
-            UserProfileResponse profile = UserProfileResponse.builder()
-                    .username(user.getUsername())
-                    .email(user.getEmail())
-                    .enabled(user.isEnabled())
-                    .roles(roles)
-                    .firstName(user.getFirstName())
-                    .lastName(user.getLastName())
-                    .fullName(user.getFullName())
-                    .phone(user.getPhone())
-                    .provider(user.getProvider().name())
-                    .hasPassword(user.getPassword() != null && !user.getPassword().isEmpty())
-                    .build();
+            UserProfileResponse profile = buildUserProfileResponse(user);
 
             return new AuthResponse(
                     jwtService.generateAccessToken(user.getUsername(), Collections.emptyMap()),
@@ -194,18 +185,7 @@ public class AuthService {
                 .map(Role::getName)
                 .collect(Collectors.toSet());
 
-        UserProfileResponse profile = UserProfileResponse.builder()
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .enabled(user.isEnabled())
-                .roles(roles)
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .fullName(user.getFullName())
-                .phone(user.getPhone())
-                .provider(user.getProvider().name())
-                .hasPassword(user.getPassword() != null && !user.getPassword().isEmpty())
-                .build();
+        UserProfileResponse profile = buildUserProfileResponse(user);
 
         return new AuthResponse(
                 newAccessToken,
@@ -295,6 +275,35 @@ public class AuthService {
             ipBlockedUntil.put(clientIp, System.currentTimeMillis() + BLOCK_TIME_IP);
             ipLoginAttempts.remove(clientIp);
         }
+    }
+
+    private UserProfileResponse buildUserProfileResponse(User user) {
+        Set<String> roles = user.getRoles().stream()
+                .map(Role::getName)
+                .collect(Collectors.toSet());
+
+        String profileImageUrl = null;
+        if (user.getProfileImageId() != null) {
+            try {
+                profileImageUrl = fileService.getFileUrl(user.getProfileImageId());
+            } catch (Exception e) {
+                profileImageUrl = null; // Si falla, dejamos null
+            }
+        }
+
+        return UserProfileResponse.builder()
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .enabled(user.isEnabled())
+                .roles(roles)
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .fullName(user.getFullName())
+                .phone(user.getPhone())
+                .provider(user.getProvider().name())
+                .hasPassword(user.getPassword() != null && !user.getPassword().isEmpty())
+                .profileImageUrl(profileImageUrl)
+                .build();
     }
 
 
