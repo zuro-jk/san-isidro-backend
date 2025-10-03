@@ -1,29 +1,40 @@
 package com.sanisidro.restaurante.core.security.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
 import com.sanisidro.restaurante.core.aws.model.FileMetadata;
 import com.sanisidro.restaurante.core.aws.service.FileService;
 import com.sanisidro.restaurante.core.exceptions.EmailChangeNotAllowedException;
 import com.sanisidro.restaurante.core.exceptions.InvalidPasswordException;
 import com.sanisidro.restaurante.core.exceptions.UserNotFoundException;
 import com.sanisidro.restaurante.core.exceptions.UsernameChangeNotAllowedException;
-import com.sanisidro.restaurante.core.security.dto.*;
+import com.sanisidro.restaurante.core.security.dto.ChanguePasswordRequest;
+import com.sanisidro.restaurante.core.security.dto.UpdateProfileRequest;
+import com.sanisidro.restaurante.core.security.dto.UpdateProfileResponse;
+import com.sanisidro.restaurante.core.security.dto.UserProfileResponse;
+import com.sanisidro.restaurante.core.security.dto.UserSessionResponse;
+import com.sanisidro.restaurante.core.security.enums.AuthProvider;
 import com.sanisidro.restaurante.core.security.jwt.JwtService;
 import com.sanisidro.restaurante.core.security.model.RefreshToken;
 import com.sanisidro.restaurante.core.security.model.Role;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
+import com.sanisidro.restaurante.features.notifications.dto.EmailVerificationEvent;
+import com.sanisidro.restaurante.features.notifications.kafka.NotificationProducer;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +45,10 @@ public class UserService {
     private final JwtService jwtService;
     private final UserRepository userRepository;
     private final FileService fileService;
+    private final NotificationProducer notificationProducer;
+
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
 
     @Transactional(readOnly = true)
     public List<UserSessionResponse> getSessions(User user, String currentAccessToken) {
@@ -45,17 +60,25 @@ public class UserService {
     }
 
     @Transactional
-    public UpdateProfileResponse updateProfile(String username, UpdateProfileRequest request) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
-
+    public UpdateProfileResponse updateProfile(User user, UpdateProfileRequest request) {
         boolean loginChanged = false;
+        boolean passwordRequired = false;
 
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setPhone(request.getPhone());
 
-        if (!request.getEmail().equals(user.getEmail())) {
+        String newEmail = request.getEmail().toLowerCase();
+
+        if (!newEmail.equals(user.getEmail().toLowerCase())) {
+
+            if (user.getProvider() != AuthProvider.LOCAL
+                    && (user.getPassword() == null || user.getPassword().isEmpty())) {
+                passwordRequired = true;
+                throw new InvalidPasswordException(
+                        "Debes establecer una contraseña antes de cambiar tu correo.");
+            }
+
             if (user.getLastEmailChange() != null) {
                 LocalDateTime nextAllowedEmailChange = user.getLastEmailChange().plusDays(30);
                 if (LocalDateTime.now().isBefore(nextAllowedEmailChange)) {
@@ -64,16 +87,42 @@ public class UserService {
                             "No puedes cambiar tu email aún. Te faltan " + daysLeft + " días.");
                 }
             }
-            if (userRepository.existsByEmail(request.getEmail())) {
+
+            if (userRepository.existsByEmailIgnoreCase(newEmail)) {
                 throw new EmailChangeNotAllowedException("El email ya está en uso");
             }
-            user.setEmail(request.getEmail());
+
+            user.setEmail(newEmail);
             user.setLastEmailChange(LocalDateTime.now());
             user.setEmailVerified(false);
+
+            if (user.getProvider() != AuthProvider.LOCAL) {
+                user.setGoogleId(null);
+                user.setFacebookId(null);
+                user.setGithubId(null);
+                user.setProvider(AuthProvider.LOCAL);
+                passwordRequired = true;
+            }
+
+            String verificationCode = UUID.randomUUID().toString();
+            user.setVerificationCode(verificationCode);
+
+            userRepository.save(user);
+
+            EmailVerificationEvent event = EmailVerificationEvent.builder()
+                    .userId(user.getId())
+                    .recipient(newEmail)
+                    .subject("Verifica tu nuevo correo")
+                    .message("Por favor verifica tu correo haciendo clic en el enlace:")
+                    .actionUrl(frontendUrl + "/verify-email?code=" + verificationCode)
+                    .build();
+            notificationProducer.send("notifications", event);
+
             loginChanged = true;
         }
 
         if (!request.getUsername().equals(user.getUsername())) {
+
             if (user.getLastUsernameChange() != null) {
                 LocalDateTime nextAllowedUsernameChange = user.getLastUsernameChange().plusDays(7);
                 if (LocalDateTime.now().isBefore(nextAllowedUsernameChange)) {
@@ -82,9 +131,11 @@ public class UserService {
                             "No puedes cambiar tu username aún. Te faltan " + daysLeft + " días.");
                 }
             }
+
             if (userRepository.existsByUsername(request.getUsername())) {
                 throw new UsernameChangeNotAllowedException("El username ya está en uso");
             }
+
             user.setUsername(request.getUsername());
             user.setLastUsernameChange(LocalDateTime.now());
             loginChanged = true;
@@ -95,11 +146,10 @@ public class UserService {
         UserProfileResponse userProfile = getUserByUsername(user.getUsername());
 
         String newToken = null;
-        if (loginChanged) {
+        if (loginChanged && !passwordRequired) {
             newToken = jwtService.generateAccessToken(
                     user.getUsername(),
-                    Map.of("roles", user.getRoles().stream().map(Role::getName).toList())
-            );
+                    Map.of("roles", user.getRoles().stream().map(Role::getName).toList()));
         }
 
         return UpdateProfileResponse.builder()
@@ -189,7 +239,5 @@ public class UserService {
                 .emailNextChange(emailNextChange)
                 .build();
     }
-
-
 
 }

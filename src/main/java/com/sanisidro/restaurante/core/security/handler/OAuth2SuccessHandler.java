@@ -25,14 +25,15 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
-                                        HttpServletResponse response,
-                                        Authentication authentication) throws IOException {
+            HttpServletResponse response,
+            Authentication authentication) throws IOException {
 
         OAuth2AuthenticationToken oauthToken = (OAuth2AuthenticationToken) authentication;
         String provider = oauthToken.getAuthorizedClientRegistrationId();
         OAuth2User oauthUser = oauthToken.getPrincipal();
 
-        String providerId = provider.equalsIgnoreCase("google") ? oauthUser.getAttribute("sub") : oauthUser.getAttribute("id");
+        String providerId = provider.equalsIgnoreCase("google") ? oauthUser.getAttribute("sub")
+                : oauthUser.getAttribute("id");
         String email = oauthUser.getAttribute("email");
         String firstName = oauthUser.getAttribute("given_name");
         String lastName = oauthUser.getAttribute("family_name");
@@ -46,33 +47,32 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         }
 
         AuthResponse authResponse = oAuthUserService.processOAuthUser(
-                provider, providerId, email, firstName, lastName, emailVerified, profileImageUrl
-        );
+                provider, providerId, email, firstName, lastName, emailVerified, profileImageUrl);
 
         log.info("OAuth2 login successful: provider={}, email={}, providerId={}", provider, email, providerId);
 
         String userJson = objectMapper.writeValueAsString(authResponse.getUser());
 
         String script = """
-            <html><body><script>
-                try {
-                    console.log('Enviando datos al frontend...');
-                    window.opener.postMessage(
-                        {
-                            success: true,
-                            accessToken: '%s',
-                            refreshToken: '%s',
-                            user: %s
-                        },
-                        'http://localhost:4200'
-                    );
-                    console.log('Datos enviados correctamente');
-                } catch(e) {
-                    console.error('Error enviando postMessage:', e);
-                }
-                window.close();
-            </script></body></html>
-        """.formatted(authResponse.getAccessToken(), authResponse.getSessionId(), userJson);
+                    <html><body><script>
+                        try {
+                            console.log('Enviando datos al frontend...');
+                            window.opener.postMessage(
+                                {
+                                    success: true,
+                                    accessToken: '%s',
+                                    refreshToken: '%s',
+                                    user: %s
+                                },
+                                'http://localhost:4200'
+                            );
+                            console.log('Datos enviados correctamente');
+                        } catch(e) {
+                            console.error('Error enviando postMessage:', e);
+                        }
+                        window.close();
+                    </script></body></html>
+                """.formatted(authResponse.getAccessToken(), authResponse.getSessionId(), userJson);
 
         response.setContentType("text/html");
         response.getWriter().write(script);

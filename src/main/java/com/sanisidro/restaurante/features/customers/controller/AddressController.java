@@ -51,8 +51,9 @@ public class AddressController {
 
     @PostMapping("/me")
     public ResponseEntity<ApiResponse<AddressResponse>> createMyAddress(
+        @AuthenticationPrincipal User user,
             @Valid @RequestBody AddressCustomerRequest dto) {
-        AddressResponse response = addressService.createAddressForCustomer(dto);
+        AddressResponse response = addressService.createAddressForCustomer(user, dto);
         return new ResponseEntity<>(new ApiResponse<>(true, "Dirección creada", response), HttpStatus.CREATED);
     }
 
@@ -71,6 +72,15 @@ public class AddressController {
             @Valid @RequestBody AddressAdminRequest dto) {
         AddressResponse response = addressService.updateAddress(id, dto);
         return ResponseEntity.ok(new ApiResponse<>(true, "Dirección actualizada (ADMIN)", response));
+    }
+
+    @PutMapping("/me/{id}")
+    public ResponseEntity<ApiResponse<AddressResponse>> updateMyAddress(
+            @PathVariable("id") Long addressId,
+            @Valid @RequestBody AddressCustomerRequest dto,
+            @AuthenticationPrincipal User user) {
+        AddressResponse response = addressService.updateAddressForCustomer(addressId, dto, user);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Dirección actualizada", response));
     }
 
 

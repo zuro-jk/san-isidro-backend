@@ -6,6 +6,8 @@ import lombok.*;
 
 import java.time.LocalTime;
 
+import com.sanisidro.restaurante.features.restaurant.enums.TableStatus;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -13,9 +15,8 @@ import java.time.LocalTime;
 @Builder
 public class TableRequest {
 
-    @NotBlank(message = "El nombre de la mesa es obligatorio")
-    @Size(max = 50, message = "El nombre no debe exceder los 50 caracteres")
-    private String name;
+    private String code;
+    private String alias;
 
     @NotNull(message = "La capacidad máxima es obligatoria")
     @Min(value = 1, message = "La capacidad mínima es 1 persona")
@@ -55,4 +56,7 @@ public class TableRequest {
     @NotNull(message = "Buffer después de la reserva es obligatorio")
     @Min(value = 0, message = "El buffer después no puede ser negativo")
     private Integer bufferAfterMinutes;
+
+    @NotNull(message = "El estado de la mesa es obligatorio")
+    private TableStatus status;
 }

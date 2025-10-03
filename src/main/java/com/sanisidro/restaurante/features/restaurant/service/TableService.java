@@ -57,7 +57,8 @@ public class TableService {
         TableEntity table = tableRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Mesa no encontrada con id: " + id));
 
-        table.setName(request.getName());
+        table.setCode(request.getCode());
+        table.setAlias(request.getAlias());
         table.setCapacity(request.getCapacity());
         table.setMinCapacity(request.getMinCapacity());
         table.setOptimalCapacity(request.getOptimalCapacity());
@@ -68,6 +69,7 @@ public class TableService {
         table.setReservationDurationMinutes(request.getReservationDurationMinutes());
         table.setBufferBeforeMinutes(request.getBufferBeforeMinutes());
         table.setBufferAfterMinutes(request.getBufferAfterMinutes());
+        table.setStatus(request.getStatus());
 
         return mapToResponse(tableRepository.save(table));
     }
@@ -135,16 +137,16 @@ public class TableService {
         for (TableEntity table : tableRepository.findAll()) {
 
             if (filterByCapacity && !table.canAccommodate(numberOfPeople)) {
-                log.info("Mesa {} descartada: no puede acomodar {} personas.", table.getName(), numberOfPeople);
+                log.info("Mesa {} descartada: no puede acomodar {} personas.", table.getCode(), numberOfPeople);
                 continue;
             }
 
             List<String> availableTimes = calculateAvailableTimes(table, date);
-            log.info("Mesa {} - Horarios calculados: {}", table.getName(), availableTimes);
+            log.info("Mesa {} - Horarios calculados: {}", table.getCode(), availableTimes);
 
             TableAvailabilityResponse response = TableAvailabilityResponse.builder()
                     .id(table.getId())
-                    .name(table.getName())
+                    .name(table.getCode())
                     .capacity(table.getCapacity())
                     .minCapacity(table.getMinCapacity())
                     .availableTimes(availableTimes)
@@ -192,7 +194,8 @@ public class TableService {
     private TableResponse mapToResponse(TableEntity table) {
         return TableResponse.builder()
                 .id(table.getId())
-                .name(table.getName())
+                .code(table.getCode())
+                .alias(table.getAlias())
                 .capacity(table.getCapacity())
                 .minCapacity(table.getMinCapacity())
                 .optimalCapacity(table.getOptimalCapacity())
@@ -209,7 +212,8 @@ public class TableService {
 
     private TableEntity mapToEntity(TableRequest request) {
         return TableEntity.builder()
-                .name(request.getName())
+                .code(request.getCode())
+                .alias(request.getAlias())
                 .capacity(request.getCapacity())
                 .minCapacity(request.getMinCapacity())
                 .optimalCapacity(request.getOptimalCapacity())
@@ -220,6 +224,7 @@ public class TableService {
                 .reservationDurationMinutes(request.getReservationDurationMinutes())
                 .bufferBeforeMinutes(request.getBufferBeforeMinutes())
                 .bufferAfterMinutes(request.getBufferAfterMinutes())
+                .status(request.getStatus())
                 .build();
     }
 

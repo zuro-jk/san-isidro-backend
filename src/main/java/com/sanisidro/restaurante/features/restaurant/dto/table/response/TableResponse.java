@@ -12,7 +12,8 @@ import java.time.LocalTime;
 @Builder
 public class TableResponse {
     private Long id;
-    private String name;
+    private String code;
+    private String alias;
     private Integer capacity;
     private Integer minCapacity;
     private Integer optimalCapacity;

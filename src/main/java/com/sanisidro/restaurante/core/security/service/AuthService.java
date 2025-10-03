@@ -2,13 +2,16 @@ package com.sanisidro.restaurante.core.security.service;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-import com.sanisidro.restaurante.core.aws.service.FileService;
-import com.sanisidro.restaurante.core.security.dto.*;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -17,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.sanisidro.restaurante.core.aws.service.FileService;
 import com.sanisidro.restaurante.core.exceptions.EmailAlreadyExistsException;
 import com.sanisidro.restaurante.core.exceptions.InvalidCredentialsException;
 import com.sanisidro.restaurante.core.exceptions.InvalidRefreshTokenException;
@@ -24,6 +28,11 @@ import com.sanisidro.restaurante.core.exceptions.InvalidVerificationCodeExceptio
 import com.sanisidro.restaurante.core.exceptions.TooManyAttemptsException;
 import com.sanisidro.restaurante.core.exceptions.UserNotFoundException;
 import com.sanisidro.restaurante.core.exceptions.UsernameAlreadyExistsException;
+import com.sanisidro.restaurante.core.security.dto.AuthResponse;
+import com.sanisidro.restaurante.core.security.dto.LoginRequest;
+import com.sanisidro.restaurante.core.security.dto.RegisterRequest;
+import com.sanisidro.restaurante.core.security.dto.UserProfileResponse;
+import com.sanisidro.restaurante.core.security.dto.UserSessionResponse;
 import com.sanisidro.restaurante.core.security.jwt.JwtService;
 import com.sanisidro.restaurante.core.security.model.RefreshToken;
 import com.sanisidro.restaurante.core.security.model.Role;
@@ -34,6 +43,7 @@ import com.sanisidro.restaurante.core.security.repository.UserRepository;
 import com.sanisidro.restaurante.features.notifications.dto.EmailVerificationEvent;
 import com.sanisidro.restaurante.features.notifications.kafka.NotificationProducer;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -118,7 +128,7 @@ public class AuthService {
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new UsernameAlreadyExistsException("Username ya existe");
         }
-        if (userRepository.existsByEmail(request.getEmail())) {
+        if (userRepository.existsByEmailIgnoreCase(request.getEmail())) {
             throw new EmailAlreadyExistsException("Email ya existe");
         }
 
@@ -194,7 +204,6 @@ public class AuthService {
                 profile);
     }
 
-
     @Transactional
     public void logoutAll(String accessToken, String clientIp, String userAgent) {
         if (!jwtService.validate(accessToken)) {
@@ -250,8 +259,7 @@ public class AuthService {
                         rt.getId().toString(),
                         rt.getExpiryDate(),
                         rt.getIp(),
-                        rt.getUserAgent()
-                ))
+                        rt.getUserAgent()))
                 .collect(Collectors.toList());
     }
 
@@ -318,6 +326,5 @@ public class AuthService {
                 .emailNextChange(emailNextChange)
                 .build();
     }
-
 
 }

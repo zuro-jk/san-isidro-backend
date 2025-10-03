@@ -1,24 +1,19 @@
 package com.sanisidro.restaurante.core.security.service;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import com.sanisidro.restaurante.core.aws.model.FileMetadata;
-import com.sanisidro.restaurante.core.aws.service.FileService;
-import com.sanisidro.restaurante.core.aws.service.S3Service;
-import com.sanisidro.restaurante.core.security.enums.AuthProvider;
-import com.sanisidro.restaurante.features.customers.model.Customer;
-import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.sanisidro.restaurante.core.aws.service.FileService;
 import com.sanisidro.restaurante.core.security.dto.AuthResponse;
 import com.sanisidro.restaurante.core.security.dto.UserProfileResponse;
+import com.sanisidro.restaurante.core.security.enums.AuthProvider;
 import com.sanisidro.restaurante.core.security.jwt.JwtService;
 import com.sanisidro.restaurante.core.security.model.RefreshToken;
 import com.sanisidro.restaurante.core.security.model.Role;
@@ -26,11 +21,11 @@ import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.RefreshTokenRepository;
 import com.sanisidro.restaurante.core.security.repository.RoleRepository;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
+import com.sanisidro.restaurante.features.customers.model.Customer;
+import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.multipart.MultipartFile;
-
 
 @Service
 @RequiredArgsConstructor
@@ -45,35 +40,68 @@ public class OAuthUserService {
     private final CustomerRepository customerRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final FileService fileService;
-    private final S3Service s3Service;
     private final JwtService jwtService;
 
     @Transactional
     public AuthResponse processOAuthUser(String provider, String providerId,
-                                         String email, String firstName, String lastName,
-                                         Boolean emailVerified, String profileImageUrl) {
+            String email, String firstName, String lastName,
+            Boolean emailVerified, String profileImageUrl) {
 
-        User user = findByProviderId(provider, providerId)
-                .orElseGet(() -> createUserFromOAuth(provider, providerId, email, firstName, lastName, emailVerified, profileImageUrl));
+        String normalizedEmail = email.toLowerCase();
 
+        Optional<User> userOpt = findByProviderId(provider, providerId);
+        User user;
+
+        if (userOpt.isPresent()) {
+            user = userOpt.get();
+        } else {
+            Optional<User> userByEmail = userRepository.findByEmailIgnoreCase(normalizedEmail);
+
+            if (userByEmail.isPresent()) {
+                // Usuario existente con email, actualizar provider
+                user = userByEmail.get();
+
+                switch (provider.toLowerCase()) {
+                    case "google" -> {
+                        user.setProvider(AuthProvider.GOOGLE);
+                        user.setGoogleId(providerId);
+                    }
+                    case "facebook" -> {
+                        user.setProvider(AuthProvider.FACEBOOK);
+                        user.setFacebookId(providerId);
+                    }
+                    case "github" -> {
+                        user.setProvider(AuthProvider.GITHUB);
+                        user.setGithubId(providerId);
+                    }
+                }
+
+                userRepository.save(user);
+            } else {
+                // Crear nuevo usuario OAuth
+                user = createUserFromOAuth(provider, providerId, normalizedEmail,
+                        firstName, lastName, emailVerified, profileImageUrl);
+            }
+        }
+
+        // Generar tokens
         String accessToken = jwtService.generateAccessToken(
                 user.getUsername(),
                 Map.of("roles", user.getRoles().stream().map(Role::getName).toList()));
 
         RefreshToken refreshTokenEntity = createRefreshToken(user);
 
-        String finalProfileImageUrl = null;
+        // Construir profile image
+        String finalProfileImageUrl = profileImageUrl;
         if (user.getProfileImageId() != null) {
             try {
                 finalProfileImageUrl = fileService.getFileUrl(user.getProfileImageId());
             } catch (Exception e) {
-                log.warn("No se pudo obtener la URL de S3, usando URL del proveedor: {}", e.getMessage());
-                finalProfileImageUrl = profileImageUrl;
+                log.warn("No se pudo obtener URL de S3, usando URL del proveedor: {}", e.getMessage());
             }
-        } else if (profileImageUrl != null && !profileImageUrl.isBlank()) {
-            finalProfileImageUrl = profileImageUrl;
         }
 
+        // Construir response
         UserProfileResponse userProfile = UserProfileResponse.builder()
                 .username(user.getUsername())
                 .email(user.getEmail())
@@ -84,7 +112,7 @@ public class OAuthUserService {
                 .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
                 .phone(user.getPhone())
                 .provider(user.getProvider() != null ? user.getProvider().name() : null)
-                .hasPassword(user.getPassword() != null)
+                .hasPassword(user.getPassword() != null && !user.getPassword().isEmpty())
                 .profileImageUrl(finalProfileImageUrl)
                 .build();
 
@@ -105,13 +133,22 @@ public class OAuthUserService {
     }
 
     private User createUserFromOAuth(String provider, String providerId, String email,
-                                     String firstName, String lastName, Boolean emailVerified,
-                                     String profileImageUrl) {
+            String firstName, String lastName, Boolean emailVerified,
+            String profileImageUrl) {
 
         User user = new User();
         user.setEmail(email);
-        user.setUsername(email);
 
+        // Generar username único para evitar duplicados
+        String baseUsername = provider.toLowerCase() + "_" + providerId;
+        String username = baseUsername;
+        int counter = 1;
+        while (userRepository.existsByUsername(username)) {
+            username = baseUsername + "_" + counter++;
+        }
+        user.setUsername(username);
+
+        // Nombres
         if (firstName == null && lastName == null) {
             user.setFirstName(email.split("@")[0]);
             user.setLastName("");
@@ -128,6 +165,7 @@ public class OAuthUserService {
         user.setPassword(null);
         user.setEmailVerified(emailVerified != null && emailVerified);
 
+        // Provider
         switch (provider.toLowerCase()) {
             case "google" -> {
                 user.setProvider(AuthProvider.GOOGLE);
@@ -153,7 +191,6 @@ public class OAuthUserService {
 
         user.setProfileImageId(null);
 
-        log.info("Creando nuevo usuario OAuth2: {} (provider={})", email, provider);
         User savedUser = userRepository.save(user);
 
         Customer customer = Customer.builder()
@@ -161,6 +198,8 @@ public class OAuthUserService {
                 .user(savedUser)
                 .build();
         customerRepository.save(customer);
+
+        log.info("Nuevo usuario OAuth creado: {} (provider={})", email, provider);
 
         return savedUser;
     }

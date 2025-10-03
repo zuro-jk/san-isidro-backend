@@ -1,5 +1,14 @@
 package com.sanisidro.restaurante.features.customers.service;
 
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.sanisidro.restaurante.core.dto.response.PagedResponse;
 import com.sanisidro.restaurante.core.exceptions.ResourceNotFoundException;
 import com.sanisidro.restaurante.core.security.model.User;
@@ -10,19 +19,10 @@ import com.sanisidro.restaurante.features.customers.model.Address;
 import com.sanisidro.restaurante.features.customers.model.Customer;
 import com.sanisidro.restaurante.features.customers.repository.AddressRepository;
 import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
+
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,11 +41,8 @@ public class AddressService {
     }
 
     @Transactional
-    public AddressResponse createAddressForCustomer(AddressCustomerRequest dto) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User currentUser = (User) authentication.getPrincipal();
-
-        Customer customer = customerRepository.findByUserId(currentUser.getId())
+    public AddressResponse createAddressForCustomer(User user, AddressCustomerRequest dto) {
+        Customer customer = customerRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado para el usuario autenticado"));
 
         return createAddressInternal(customer,
@@ -53,7 +50,6 @@ public class AddressService {
                 dto.getCity(), dto.getProvince(),
                 dto.getZipCode(), dto.getInstructions());
     }
-
 
     @Transactional(readOnly = true)
     public AddressResponse getAddress(Long id) {
@@ -74,7 +70,7 @@ public class AddressService {
     }
 
     @Transactional(readOnly = true)
-    public PagedResponse<AddressResponse> getAllAddresses( Pageable pageable) {
+    public PagedResponse<AddressResponse> getAllAddresses(Pageable pageable) {
         Page<Address> page = addressRepository.findAll(pageable);
         List<AddressResponse> content = page.getContent().stream()
                 .map(this::mapToResponse)
@@ -103,6 +99,26 @@ public class AddressService {
     }
 
     @Transactional
+    public AddressResponse updateAddressForCustomer(Long addressId, AddressCustomerRequest dto, User user) {
+        Address address = findAddressById(addressId);
+
+        if (!address.getCustomer().getUser().getId().equals(user.getId())) {
+            throw new ResourceNotFoundException("No puedes editar esta dirección");
+        }
+
+        // Actualizar campos permitidos
+        address.setStreet(dto.getStreet());
+        address.setReference(dto.getReference());
+        address.setCity(dto.getCity());
+        address.setProvince(dto.getProvince());
+        address.setZipCode(dto.getZipCode());
+        address.setInstructions(dto.getInstructions());
+
+        Address updated = addressRepository.save(address);
+        return mapToResponse(updated);
+    }
+
+    @Transactional
     public void deleteAddress(Long id) {
         Address address = addressRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Not found"));
@@ -111,11 +127,10 @@ public class AddressService {
         customer.getAddresses().remove(address);
     }
 
-
     private AddressResponse createAddressInternal(Customer customer,
-                                                  String street, String reference,
-                                                  String city, String province,
-                                                  String zipCode, String instructions) {
+            String street, String reference,
+            String city, String province,
+            String zipCode, String instructions) {
         Address address = Address.builder()
                 .customer(customer)
                 .street(street)
@@ -139,7 +154,6 @@ public class AddressService {
         return addressRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Dirección no encontrada"));
     }
-
 
     private AddressResponse mapToResponse(Address address) {
         return AddressResponse.builder()
