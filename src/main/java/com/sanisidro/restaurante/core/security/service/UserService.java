@@ -9,6 +9,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,6 +58,60 @@ public class UserService {
         String currentSessionId = currentSession.map(rt -> rt.getId().toString()).orElse("");
 
         return authService.getUserSessions(user, currentSessionId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserProfileResponse> getUsersForAdmin(User requestingUser) {
+        boolean isAdmin = requestingUser.getRoles().stream()
+                .map(Role::getName)
+                .anyMatch(r -> r.equals("ROLE_ADMIN"));
+
+        if (!isAdmin) {
+            throw new AccessDeniedException("Acceso denegado: solo administradores");
+        }
+
+        // Filtrar usuarios no clientes
+        Set<String> excludedRoles = Set.of("ROLE_CLIENT");
+
+        List<User> users = userRepository.findAll().stream()
+                .filter(user -> user.getRoles().stream()
+                        .map(Role::getName)
+                        .noneMatch(excludedRoles::contains))
+                .collect(Collectors.toList());
+
+        return users.stream()
+                .map(u -> getUserByUsername(u.getUsername()))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public UserProfileResponse getUserById(User requestingUser, Long userId) {
+        boolean isAdmin = requestingUser.getRoles().stream()
+                .map(Role::getName)
+                .anyMatch(r -> r.equals("ROLE_ADMIN"));
+
+        if (!isAdmin) {
+            throw new AccessDeniedException("Acceso denegado: solo administradores");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
+
+        return UserProfileResponse.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .enabled(user.isEnabled())
+                .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .fullName(user.getFullName())
+                .phone(user.getPhone())
+                .provider(user.getProvider().name())
+                .hasPassword(user.getPassword() != null && !user.getPassword().isEmpty())
+                .profileImageUrl(
+                        user.getProfileImageId() != null ? fileService.getFileUrl(user.getProfileImageId()) : null)
+                .build();
     }
 
     @Transactional
@@ -224,6 +279,7 @@ public class UserService {
         }
 
         return UserProfileResponse.builder()
+                .id(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .enabled(user.isEnabled())

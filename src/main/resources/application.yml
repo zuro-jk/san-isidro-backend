@@ -8,7 +8,6 @@ logging:
     org.hibernate.engine.transaction.internal.TransactionImpl: DEBUG
 
 spring:
-
   profiles:
     active: dev
 
@@ -93,8 +92,8 @@ app:
     rate: 0.18
   jwt:
     secret: ${JWT_SECRET:N8sH0LkP7C9y4q1F2B3X6vTj8dW+zR5YhK0pUgQeMnAoIsJcZxVbTfLrGw==}
-    access-token-expiration: 3600000       # 1 hora
-    refresh-token-expiration: 1209600000   # 14 dias
+    access-token-expiration: 3600000 # 1 hora
+    refresh-token-expiration: 1209600000 # 14 dias
   file:
     allowed-extensions: [".jpg", ".jpeg", ".png", ".pdf", ".mp4", ".mp3"]
     allowed-folders: ["products", "profiles", "general"]

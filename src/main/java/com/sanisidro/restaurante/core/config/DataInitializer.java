@@ -24,11 +24,14 @@ import com.sanisidro.restaurante.features.customers.model.Customer;
 import com.sanisidro.restaurante.features.customers.model.LoyaltyRule;
 import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
 import com.sanisidro.restaurante.features.customers.repository.LoyaltyRuleRepository;
+import com.sanisidro.restaurante.features.employees.enums.DayOfWeekEnum;
 import com.sanisidro.restaurante.features.employees.enums.EmploymentStatus;
 import com.sanisidro.restaurante.features.employees.model.Employee;
 import com.sanisidro.restaurante.features.employees.model.Position;
+import com.sanisidro.restaurante.features.employees.model.Schedule;
 import com.sanisidro.restaurante.features.employees.repository.EmployeeRepository;
 import com.sanisidro.restaurante.features.employees.repository.PositionRepository;
+import com.sanisidro.restaurante.features.employees.repository.ScheduleRepository;
 import com.sanisidro.restaurante.features.orders.model.OrderStatus;
 import com.sanisidro.restaurante.features.orders.model.OrderStatusTranslation;
 import com.sanisidro.restaurante.features.orders.model.OrderType;
@@ -95,6 +98,7 @@ public class DataInitializer implements CommandLineRunner {
         private final PaymentMethodRepository paymentMethodRepository;
         private final PaymentMethodTranslationRepository paymentMethodTranslationRepository;
         private final CustomerRepository customerRepository;
+        private final ScheduleRepository scheduleRepository;
 
         @Override
         public void run(String... args) throws Exception {
@@ -972,6 +976,7 @@ public class DataInitializer implements CommandLineRunner {
 
                 positionRepository.saveAll(List.of(adminPosition, waiterPosition, chefPosition));
 
+                // Crear usuarios
                 User adminUser = userRepository.findByUsername("admin")
                                 .orElseThrow(() -> new IllegalStateException("El usuario admin debería existir"));
                 adminUser.syncRolesWithPosition(adminPosition);
@@ -985,7 +990,6 @@ public class DataInitializer implements CommandLineRunner {
                                 .enabled(true)
                                 .provider(AuthProvider.LOCAL)
                                 .build();
-
                 waiterUser.syncRolesWithPosition(waiterPosition);
 
                 User chefUser = User.builder()
@@ -997,11 +1001,11 @@ public class DataInitializer implements CommandLineRunner {
                                 .enabled(true)
                                 .provider(AuthProvider.LOCAL)
                                 .build();
-
                 chefUser.syncRolesWithPosition(chefPosition);
 
                 userRepository.saveAll(List.of(waiterUser, chefUser));
 
+                // Crear empleados
                 Employee adminEmployee = Employee.builder()
                                 .user(adminUser)
                                 .position(adminPosition)
@@ -1028,7 +1032,30 @@ public class DataInitializer implements CommandLineRunner {
 
                 employeeRepository.saveAll(List.of(adminEmployee, waiterEmployee, chefEmployee));
 
-                log.info(">>> Empleados inicializados correctamente con usuarios y posiciones");
+                Schedule adminSchedule = Schedule.builder()
+                                .employee(adminEmployee)
+                                .dayOfWeek(DayOfWeekEnum.MONDAY)
+                                .startTime(LocalTime.of(9, 0))
+                                .endTime(LocalTime.of(17, 0))
+                                .build();
+
+                Schedule waiterSchedule = Schedule.builder()
+                                .employee(waiterEmployee)
+                                .dayOfWeek(DayOfWeekEnum.TUESDAY)
+                                .startTime(LocalTime.of(10, 0))
+                                .endTime(LocalTime.of(18, 0))
+                                .build();
+
+                Schedule chefSchedule = Schedule.builder()
+                                .employee(chefEmployee)
+                                .dayOfWeek(DayOfWeekEnum.WEDNESDAY)
+                                .startTime(LocalTime.of(11, 0))
+                                .endTime(LocalTime.of(19, 0))
+                                .build();
+
+                scheduleRepository.saveAll(List.of(adminSchedule, waiterSchedule, chefSchedule));
+
+                log.info(">>> Empleados inicializados correctamente con usuarios, posiciones y horarios");
         }
 
         private void initPaymentMethods() {

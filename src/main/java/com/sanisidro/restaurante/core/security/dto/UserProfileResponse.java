@@ -13,6 +13,7 @@ import java.util.Set;
 @AllArgsConstructor
 @Builder
 public class UserProfileResponse {
+    private Long id;
     private String username;
     private String email;
     private boolean enabled;

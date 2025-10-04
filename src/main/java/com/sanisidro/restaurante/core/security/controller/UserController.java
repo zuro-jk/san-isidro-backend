@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -45,6 +46,16 @@ public class UserController {
         return ResponseEntity.ok(new ApiResponse<>(true, "Perfil obtenido correctamente", profile));
     }
 
+    @GetMapping("/admin")
+    public ResponseEntity<ApiResponse<List<UserProfileResponse>>> getUsersForAdmin(
+            @AuthenticationPrincipal User user) {
+
+        List<UserProfileResponse> users = userService.getUsersForAdmin(user);
+
+        return ResponseEntity.ok(
+                new ApiResponse<>(true, "Usuarios obtenidos correctamente", users));
+    }
+
     @GetMapping("/sessions")
     public ResponseEntity<ApiResponse<List<UserSessionResponse>>> getSessions(
             @AuthenticationPrincipal User user,
@@ -61,6 +72,15 @@ public class UserController {
 
         return ResponseEntity.ok(
                 new ApiResponse<>(true, "Sesiones obtenidas correctamente", sessions));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> getUserById(
+            @AuthenticationPrincipal User user,
+            @PathVariable Long id) {
+        UserProfileResponse userProfile = userService.getUserById(user, id);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Usuario obtenido correctamente", userProfile));
+
     }
 
     @PutMapping("/update-profile")
