@@ -6,6 +6,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.springframework.boot.CommandLineRunner;
@@ -955,68 +956,120 @@ public class DataInitializer implements CommandLineRunner {
 
                 log.info(">>> Inicializando posiciones, usuarios y empleados...");
 
-                // Crear posiciones
-                Position adminPosition = Position.builder()
-                                .name("ADMIN")
-                                .description("Administrador del sistema")
-                                .roles(Set.of(roleRepository.findByName("ROLE_ADMIN").orElseThrow()))
-                                .build();
+                // ==== Cargar roles ====
+                Role adminRole = roleRepository.findByName("ROLE_ADMIN").orElseThrow();
+                Role waiterRole = roleRepository.findByName("ROLE_WAITER").orElseThrow();
+                Role chefRole = roleRepository.findByName("ROLE_CHEF").orElseThrow();
+                Role cashierRole = roleRepository.findByName("ROLE_CASHIER").orElseThrow();
+                Role supplierRole = roleRepository.findByName("ROLE_SUPPLIER").orElseThrow();
+                Role clientRole = roleRepository.findByName("ROLE_CLIENT").orElseThrow();
 
-                Position waiterPosition = Position.builder()
-                                .name("WAITER")
-                                .description("Mesero del restaurante")
-                                .roles(Set.of(roleRepository.findByName("ROLE_WAITER").orElseThrow()))
-                                .build();
+                // ==== Crear posiciones (con combinaciones jerárquicas de roles) ====
+                Map<String, Position> positions = Map.of(
+                                "ADMIN", Position.builder()
+                                                .name("ADMIN")
+                                                .description("Administrador general del sistema con control total")
+                                                .roles(Set.of(adminRole))
+                                                .build(),
 
-                Position chefPosition = Position.builder()
-                                .name("CHEF")
-                                .description("Chef encargado de cocina")
-                                .roles(Set.of(roleRepository.findByName("ROLE_CHEF").orElseThrow()))
-                                .build();
+                                "MANAGER", Position.builder()
+                                                .name("MANAGER")
+                                                .description("Gerente del restaurante con acceso a caja y proveedores")
+                                                .roles(Set.of(adminRole, cashierRole, supplierRole))
+                                                .build(),
 
-                positionRepository.saveAll(List.of(adminPosition, waiterPosition, chefPosition));
+                                "WAITER", Position.builder()
+                                                .name("WAITER")
+                                                .description("Mesero o camarero del restaurante")
+                                                .roles(Set.of(waiterRole))
+                                                .build(),
 
-                // Crear usuarios
+                                "CHEF", Position.builder()
+                                                .name("CHEF")
+                                                .description("Encargado principal de cocina")
+                                                .roles(Set.of(chefRole))
+                                                .build(),
+
+                                "CASHIER", Position.builder()
+                                                .name("CASHIER")
+                                                .description("Encargado de caja y cobros")
+                                                .roles(Set.of(cashierRole))
+                                                .build(),
+
+                                "SUPPLIER", Position.builder()
+                                                .name("SUPPLIER")
+                                                .description("Encargado de insumos y proveedores")
+                                                .roles(Set.of(supplierRole))
+                                                .build(),
+
+                                "CLIENT", Position.builder()
+                                                .name("CLIENT")
+                                                .description("Cliente registrado del sistema")
+                                                .roles(Set.of(clientRole))
+                                                .build());
+
+                positionRepository.saveAll(positions.values());
+
+                // ==== Crear usuarios ====
                 User adminUser = userRepository.findByUsername("admin")
                                 .orElseThrow(() -> new IllegalStateException("El usuario admin debería existir"));
-                adminUser.syncRolesWithPosition(adminPosition);
+                adminUser.syncRolesWithPosition(positions.get("ADMIN"));
 
-                User waiterUser = User.builder()
-                                .username("maria_w")
-                                .email("maria.waiter@restaurante.com")
-                                .firstName("Maria")
-                                .lastName("Perez")
+                User managerUser = User.builder()
+                                .username("jose_m")
+                                .email("jose.manager@restaurante.com")
+                                .firstName("José")
+                                .lastName("Lopez")
                                 .password(passwordEncoder.encode("password123"))
                                 .enabled(true)
                                 .provider(AuthProvider.LOCAL)
                                 .build();
-                waiterUser.syncRolesWithPosition(waiterPosition);
+                managerUser.syncRolesWithPosition(positions.get("MANAGER"));
+
+                User waiterUser = User.builder()
+                                .username("maria_w")
+                                .email("maria.waiter@restaurante.com")
+                                .firstName("María")
+                                .lastName("Pérez")
+                                .password(passwordEncoder.encode("password123"))
+                                .enabled(true)
+                                .provider(AuthProvider.LOCAL)
+                                .build();
+                waiterUser.syncRolesWithPosition(positions.get("WAITER"));
 
                 User chefUser = User.builder()
                                 .username("carlos_c")
                                 .email("carlos.chef@restaurante.com")
                                 .firstName("Carlos")
-                                .lastName("Ramirez")
+                                .lastName("Ramírez")
                                 .password(passwordEncoder.encode("password123"))
                                 .enabled(true)
                                 .provider(AuthProvider.LOCAL)
                                 .build();
-                chefUser.syncRolesWithPosition(chefPosition);
+                chefUser.syncRolesWithPosition(positions.get("CHEF"));
 
-                userRepository.saveAll(List.of(waiterUser, chefUser));
+                userRepository.saveAll(List.of(managerUser, waiterUser, chefUser));
 
-                // Crear empleados
+                // ==== Crear empleados ====
                 Employee adminEmployee = Employee.builder()
                                 .user(adminUser)
-                                .position(adminPosition)
+                                .position(positions.get("ADMIN"))
                                 .salary(BigDecimal.valueOf(5000))
+                                .hireDate(LocalDate.now())
+                                .status(EmploymentStatus.ACTIVE)
+                                .build();
+
+                Employee managerEmployee = Employee.builder()
+                                .user(managerUser)
+                                .position(positions.get("MANAGER"))
+                                .salary(BigDecimal.valueOf(4000))
                                 .hireDate(LocalDate.now())
                                 .status(EmploymentStatus.ACTIVE)
                                 .build();
 
                 Employee waiterEmployee = Employee.builder()
                                 .user(waiterUser)
-                                .position(waiterPosition)
+                                .position(positions.get("WAITER"))
                                 .salary(BigDecimal.valueOf(2000))
                                 .hireDate(LocalDate.now())
                                 .status(EmploymentStatus.ACTIVE)
@@ -1024,38 +1077,42 @@ public class DataInitializer implements CommandLineRunner {
 
                 Employee chefEmployee = Employee.builder()
                                 .user(chefUser)
-                                .position(chefPosition)
+                                .position(positions.get("CHEF"))
                                 .salary(BigDecimal.valueOf(3000))
                                 .hireDate(LocalDate.now())
                                 .status(EmploymentStatus.ACTIVE)
                                 .build();
 
-                employeeRepository.saveAll(List.of(adminEmployee, waiterEmployee, chefEmployee));
+                employeeRepository.saveAll(List.of(adminEmployee, managerEmployee, waiterEmployee, chefEmployee));
 
-                Schedule adminSchedule = Schedule.builder()
-                                .employee(adminEmployee)
-                                .dayOfWeek(DayOfWeekEnum.MONDAY)
-                                .startTime(LocalTime.of(9, 0))
-                                .endTime(LocalTime.of(17, 0))
-                                .build();
+                // ==== Crear horarios ====
+                scheduleRepository.saveAll(List.of(
+                                Schedule.builder()
+                                                .employee(adminEmployee)
+                                                .dayOfWeek(DayOfWeekEnum.MONDAY)
+                                                .startTime(LocalTime.of(9, 0))
+                                                .endTime(LocalTime.of(17, 0))
+                                                .build(),
+                                Schedule.builder()
+                                                .employee(managerEmployee)
+                                                .dayOfWeek(DayOfWeekEnum.MONDAY)
+                                                .startTime(LocalTime.of(9, 0))
+                                                .endTime(LocalTime.of(17, 0))
+                                                .build(),
+                                Schedule.builder()
+                                                .employee(waiterEmployee)
+                                                .dayOfWeek(DayOfWeekEnum.TUESDAY)
+                                                .startTime(LocalTime.of(10, 0))
+                                                .endTime(LocalTime.of(18, 0))
+                                                .build(),
+                                Schedule.builder()
+                                                .employee(chefEmployee)
+                                                .dayOfWeek(DayOfWeekEnum.WEDNESDAY)
+                                                .startTime(LocalTime.of(11, 0))
+                                                .endTime(LocalTime.of(19, 0))
+                                                .build()));
 
-                Schedule waiterSchedule = Schedule.builder()
-                                .employee(waiterEmployee)
-                                .dayOfWeek(DayOfWeekEnum.TUESDAY)
-                                .startTime(LocalTime.of(10, 0))
-                                .endTime(LocalTime.of(18, 0))
-                                .build();
-
-                Schedule chefSchedule = Schedule.builder()
-                                .employee(chefEmployee)
-                                .dayOfWeek(DayOfWeekEnum.WEDNESDAY)
-                                .startTime(LocalTime.of(11, 0))
-                                .endTime(LocalTime.of(19, 0))
-                                .build();
-
-                scheduleRepository.saveAll(List.of(adminSchedule, waiterSchedule, chefSchedule));
-
-                log.info(">>> Empleados inicializados correctamente con usuarios, posiciones y horarios");
+                log.info(">>> Empleados inicializados correctamente con jerarquías, usuarios, posiciones y horarios");
         }
 
         private void initPaymentMethods() {

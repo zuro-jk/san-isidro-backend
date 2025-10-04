@@ -18,6 +18,7 @@ import com.sanisidro.restaurante.core.security.dto.ApiResponse;
 import com.sanisidro.restaurante.core.security.dto.ChanguePasswordRequest;
 import com.sanisidro.restaurante.core.security.dto.UpdateProfileRequest;
 import com.sanisidro.restaurante.core.security.dto.UpdateProfileResponse;
+import com.sanisidro.restaurante.core.security.dto.UpdateUserRequest;
 import com.sanisidro.restaurante.core.security.dto.UserProfileResponse;
 import com.sanisidro.restaurante.core.security.dto.UserSessionResponse;
 import com.sanisidro.restaurante.core.security.model.User;
@@ -112,6 +113,17 @@ public class UserController {
         UserProfileResponse updatedProfile = userService.updateProfileImage(user, file);
 
         return ResponseEntity.ok(new ApiResponse<>(true, "Imagen de perfil actualizada", updatedProfile));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> updateUserById(
+            @AuthenticationPrincipal User requestingUser,
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateUserRequest request) {
+
+        UserProfileResponse updatedUser = userService.updateUserById(requestingUser, id, request);
+        return ResponseEntity.ok(
+                new ApiResponse<>(true, "Usuario actualizado correctamente", updatedUser));
     }
 
     @PutMapping("/change-password")

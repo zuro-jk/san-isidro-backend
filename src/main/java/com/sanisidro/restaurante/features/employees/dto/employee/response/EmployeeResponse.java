@@ -1,10 +1,14 @@
 package com.sanisidro.restaurante.features.employees.dto.employee.response;
 
-import lombok.*;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Getter
 @Setter
@@ -12,20 +16,26 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class EmployeeResponse {
-    private Long id;
-    private Long userId;
-    private String username;
-    private String fullName;
+  private Long id;
+  private Long userId;
 
-    private String positionName;
-    private String positionDescription;
+  private String username;
+  private String email;
+  private String firstName;
+  private String lastName;
+  private String fullName;
+  private String profileImageUrl;
 
-    private BigDecimal salary;
-    private String status;
-    private LocalDate hireDate;
+  private Long positionId;
+  private String positionName;
+  private String positionDescription;
 
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private Long createdBy;
-    private Long updatedBy;
+  private BigDecimal salary;
+  private String status;
+  private LocalDate hireDate;
+
+  private LocalDateTime createdAt;
+  private LocalDateTime updatedAt;
+  private Long createdBy;
+  private Long updatedBy;
 }

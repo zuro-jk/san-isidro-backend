@@ -157,11 +157,7 @@ public class User implements UserDetails {
     }
 
     public void syncRolesWithPosition(Position position) {
-        Set<Role> extraRoles = new HashSet<>(this.roles);
-        extraRoles.removeAll(position.getRoles());
-
         this.roles.clear();
         this.roles.addAll(position.getRoles());
-        this.roles.addAll(extraRoles);
     }
 }

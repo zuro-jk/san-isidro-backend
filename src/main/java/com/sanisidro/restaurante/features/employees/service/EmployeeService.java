@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.sanisidro.restaurante.core.aws.service.FileService;
 import com.sanisidro.restaurante.core.dto.response.PagedResponse;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
@@ -28,6 +29,7 @@ public class EmployeeService {
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
     private final PositionRepository positionRepository;
+    private final FileService fileService;
 
     public List<EmployeeResponse> getAll() {
         return employeeRepository.findAll()
@@ -129,16 +131,34 @@ public class EmployeeService {
         Position pos = employee.getPosition();
         User user = employee.getUser();
 
+        String profileImageUrl = null;
+        if (user.getProfileImageId() != null) {
+            try {
+                profileImageUrl = fileService.getFileUrl(user.getProfileImageId());
+            } catch (Exception e) {
+                profileImageUrl = null;
+            }
+        }
+
         return EmployeeResponse.builder()
                 .id(employee.getId())
                 .userId(user != null ? user.getId() : null)
+
                 .username(user != null ? user.getUsername() : null)
+                .email(user != null ? user.getEmail() : null)
+                .firstName(user != null ? user.getFirstName() : null)
+                .lastName(user != null ? user.getLastName() : null)
                 .fullName(user != null ? user.getFullName() : null)
+                .profileImageUrl(profileImageUrl)
+
+                .positionId(pos != null ? pos.getId() : null)
                 .positionName(pos != null ? pos.getName() : null)
                 .positionDescription(pos != null ? pos.getDescription() : null)
+
                 .salary(employee.getSalary())
                 .status(employee.getStatus() != null ? employee.getStatus().name() : null)
                 .hireDate(employee.getHireDate())
+
                 .createdAt(employee.getCreatedAt())
                 .updatedAt(employee.getUpdatedAt())
                 .createdBy(employee.getCreatedBy())

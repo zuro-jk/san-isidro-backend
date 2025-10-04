@@ -24,6 +24,7 @@ import com.sanisidro.restaurante.core.exceptions.UsernameChangeNotAllowedExcepti
 import com.sanisidro.restaurante.core.security.dto.ChanguePasswordRequest;
 import com.sanisidro.restaurante.core.security.dto.UpdateProfileRequest;
 import com.sanisidro.restaurante.core.security.dto.UpdateProfileResponse;
+import com.sanisidro.restaurante.core.security.dto.UpdateUserRequest;
 import com.sanisidro.restaurante.core.security.dto.UserProfileResponse;
 import com.sanisidro.restaurante.core.security.dto.UserSessionResponse;
 import com.sanisidro.restaurante.core.security.enums.AuthProvider;
@@ -70,8 +71,8 @@ public class UserService {
             throw new AccessDeniedException("Acceso denegado: solo administradores");
         }
 
-        // Filtrar usuarios no clientes
-        Set<String> excludedRoles = Set.of("ROLE_CLIENT");
+        // Excluir usuarios con roles que no pertenecen al personal interno
+        Set<String> excludedRoles = Set.of("ROLE_CLIENT", "ROLE_SUPPLIER");
 
         List<User> users = userRepository.findAll().stream()
                 .filter(user -> user.getRoles().stream()
@@ -227,6 +228,42 @@ public class UserService {
         UserProfileResponse profile = getUserByUsername(user.getUsername());
         profile.setProfileImageUrl(metadata.getUrl());
         return profile;
+    }
+
+    @Transactional
+    public UserProfileResponse updateUserById(User requestingUser, Long userId, UpdateUserRequest request) {
+        boolean isAdmin = requestingUser.getRoles().stream()
+                .map(Role::getName)
+                .anyMatch(r -> r.equals("ROLE_ADMIN"));
+
+        if (!isAdmin) {
+            throw new AccessDeniedException("Acceso denegado: solo administradores pueden modificar usuarios.");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
+
+        user.setUsername(request.getUsername());
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
+        user.setEmail(request.getEmail());
+        user.setPhone(request.getPhone());
+        user.setEnabled(request.isEnabled());
+
+        if (request.getRoles() != null && !request.getRoles().isEmpty()) {
+            Set<Role> newRoles = request.getRoles().stream()
+                    .map(roleName -> {
+                        Role role = new Role();
+                        role.setName(roleName);
+                        return role;
+                    })
+                    .collect(Collectors.toSet());
+            user.setRoles(newRoles);
+        }
+
+        userRepository.save(user);
+
+        return getUserByUsername(user.getUsername());
     }
 
     @Transactional
