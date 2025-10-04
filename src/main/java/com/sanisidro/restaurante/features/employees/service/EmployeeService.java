@@ -32,7 +32,7 @@ public class EmployeeService {
     private final FileService fileService;
 
     public List<EmployeeResponse> getAll() {
-        return employeeRepository.findAll()
+        return employeeRepository.findByPositionNameNotIgnoreCase("SUPPLIER")
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -43,6 +43,8 @@ public class EmployeeService {
 
         List<EmployeeResponse> content = page.getContent()
                 .stream()
+                .filter(e -> e.getPosition() != null
+                        && !"SUPPLIER".equalsIgnoreCase(e.getPosition().getName()))
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
 
@@ -50,8 +52,8 @@ public class EmployeeService {
                 content,
                 page.getNumber(),
                 page.getSize(),
-                page.getTotalElements(),
-                page.getTotalPages(),
+                content.size(), // total filtrado
+                (int) Math.ceil((double) content.size() / page.getSize()),
                 page.isLast());
     }
 

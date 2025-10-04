@@ -961,7 +961,6 @@ public class DataInitializer implements CommandLineRunner {
                 Role waiterRole = roleRepository.findByName("ROLE_WAITER").orElseThrow();
                 Role chefRole = roleRepository.findByName("ROLE_CHEF").orElseThrow();
                 Role cashierRole = roleRepository.findByName("ROLE_CASHIER").orElseThrow();
-                Role supplierRole = roleRepository.findByName("ROLE_SUPPLIER").orElseThrow();
                 Role clientRole = roleRepository.findByName("ROLE_CLIENT").orElseThrow();
 
                 // ==== Crear posiciones (con combinaciones jerárquicas de roles) ====
@@ -975,7 +974,7 @@ public class DataInitializer implements CommandLineRunner {
                                 "MANAGER", Position.builder()
                                                 .name("MANAGER")
                                                 .description("Gerente del restaurante con acceso a caja y proveedores")
-                                                .roles(Set.of(adminRole, cashierRole, supplierRole))
+                                                .roles(Set.of(adminRole, cashierRole))
                                                 .build(),
 
                                 "WAITER", Position.builder()
@@ -994,12 +993,6 @@ public class DataInitializer implements CommandLineRunner {
                                                 .name("CASHIER")
                                                 .description("Encargado de caja y cobros")
                                                 .roles(Set.of(cashierRole))
-                                                .build(),
-
-                                "SUPPLIER", Position.builder()
-                                                .name("SUPPLIER")
-                                                .description("Encargado de insumos y proveedores")
-                                                .roles(Set.of(supplierRole))
                                                 .build(),
 
                                 "CLIENT", Position.builder()
