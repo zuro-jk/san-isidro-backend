@@ -17,12 +17,10 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String usernameOrEmail) throws UsernameNotFoundException {
-        // Buscar por username o email
         User user = userRepository.findByUsernameOrEmail(usernameOrEmail, usernameOrEmail)
                 .orElseThrow(() -> new UsernameNotFoundException(
                         "Usuario no encontrado con username o email: " + usernameOrEmail));
 
-        // Si el usuario es OAuth y aún no tiene password, asignamos null (ya viene de la DB)
         return user;
     }
 }

@@ -1,15 +1,39 @@
 package com.sanisidro.restaurante.core.security.model;
 
-import com.sanisidro.restaurante.core.security.enums.AuthProvider;
-import com.sanisidro.restaurante.features.employees.model.Position;
-import jakarta.persistence.*;
-import lombok.*;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
-
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import com.sanisidro.restaurante.core.security.enums.AuthProvider;
+import com.sanisidro.restaurante.features.employees.model.Position;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "users")
@@ -26,15 +50,24 @@ public class User implements UserDetails {
     private Long id;
 
     @Column(unique = true, nullable = false)
+    @NotBlank(message = "El nombre de usuario no puede estar vacío")
+    @Size(max = 30, message = "El nombre de usuario no puede tener más de 30 caracteres")
     private String username;
 
     @Column(name = "first_name", nullable = false)
+    @NotBlank(message = "El nombre no puede estar vacío")
+    @Size(max = 50, message = "El nombre no puede tener más de 50 caracteres")
     private String firstName;
 
     @Column(name = "last_name", nullable = false)
+    @NotBlank(message = "El apellido no puede estar vacío")
+    @Size(max = 50, message = "El apellido no puede tener más de 50 caracteres")
     private String lastName;
 
     @Column(unique = true, nullable = false)
+    @NotBlank(message = "El correo no puede estar vacío")
+    @Email(message = "El correo no es válido")
+    @Size(max = 100, message = "El correo no puede tener más de 100 caracteres")
     private String email;
 
     @Column
@@ -42,6 +75,15 @@ public class User implements UserDetails {
 
     @Column
     private String phone;
+
+    @Column(name = "last_username_change")
+    private LocalDateTime lastUsernameChange;
+
+    @Column(name = "last_email_change")
+    private LocalDateTime lastEmailChange;
+
+    @Column(name = "profile_image_id")
+    private Long profileImageId;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<UserDocument> documents = new HashSet<>();
@@ -72,11 +114,7 @@ public class User implements UserDetails {
 
     @Builder.Default
     @ManyToMany(fetch = FetchType.EAGER)
-    @JoinTable(
-            name = "user_roles",
-            joinColumns = @JoinColumn(name = "user_id"),
-            inverseJoinColumns = @JoinColumn(name = "role_id")
-    )
+    @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();
 
     @Override
@@ -119,11 +157,7 @@ public class User implements UserDetails {
     }
 
     public void syncRolesWithPosition(Position position) {
-        Set<Role> extraRoles = new HashSet<>(this.roles);
-        extraRoles.removeAll(position.getRoles());
-
         this.roles.clear();
         this.roles.addAll(position.getRoles());
-        this.roles.addAll(extraRoles);
     }
 }

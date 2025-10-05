@@ -1,5 +1,23 @@
 package com.sanisidro.restaurante.features.customers.service;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
+
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+
 import com.sanisidro.restaurante.core.exceptions.InvalidReservationException;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.features.customers.model.Customer;
@@ -8,19 +26,6 @@ import com.sanisidro.restaurante.features.customers.repository.CustomerRepositor
 import com.sanisidro.restaurante.features.customers.repository.ReservationRepository;
 import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
 import com.sanisidro.restaurante.features.restaurant.repository.TableRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.util.List;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 class ReservationServiceTest {
 
@@ -32,8 +37,6 @@ class ReservationServiceTest {
 
     @Mock
     private TableRepository tableRepository;
-
-    private LoyaltyService loyaltyService = mock(LoyaltyService.class);
 
     @InjectMocks
     private ReservationService reservationService;
@@ -64,20 +67,22 @@ class ReservationServiceTest {
         // given
         TableEntity table1 = new TableEntity();
         table1.setId(1L);
-        table1.setName("Mesa 1");
+        table1.setCode("F1");
+        table1.setAlias("Mesa Centro");
         table1.setCapacity(2);
-        table1.setOpenTime(LocalTime.of(9,0));
-        table1.setCloseTime(LocalTime.of(23,0));
+        table1.setOpenTime(LocalTime.of(9, 0));
+        table1.setCloseTime(LocalTime.of(23, 0));
         table1.setReservationDurationMinutes(60);
         table1.setBufferBeforeMinutes(5);
         table1.setBufferAfterMinutes(5);
 
         TableEntity table2 = new TableEntity();
         table2.setId(2L);
-        table2.setName("Mesa 2");
+        table2.setCode("F2");
+        table2.setAlias("Mesa Ventana");
         table2.setCapacity(4);
-        table2.setOpenTime(LocalTime.of(9,0));
-        table2.setCloseTime(LocalTime.of(23,0));
+        table2.setOpenTime(LocalTime.of(9, 0));
+        table2.setCloseTime(LocalTime.of(23, 0));
         table2.setReservationDurationMinutes(60);
         table2.setBufferBeforeMinutes(5);
         table2.setBufferAfterMinutes(5);

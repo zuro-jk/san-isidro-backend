@@ -1,6 +1,14 @@
 package com.sanisidro.restaurante.features.employees.service;
 
-import com.sanisidro.restaurante.core.audit.service.AuditLogService;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.sanisidro.restaurante.core.aws.service.FileService;
 import com.sanisidro.restaurante.core.dto.response.PagedResponse;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
@@ -10,16 +18,9 @@ import com.sanisidro.restaurante.features.employees.model.Employee;
 import com.sanisidro.restaurante.features.employees.model.Position;
 import com.sanisidro.restaurante.features.employees.repository.EmployeeRepository;
 import com.sanisidro.restaurante.features.employees.repository.PositionRepository;
+
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.HashSet;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,9 +29,10 @@ public class EmployeeService {
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
     private final PositionRepository positionRepository;
+    private final FileService fileService;
 
     public List<EmployeeResponse> getAll() {
-        return employeeRepository.findAll()
+        return employeeRepository.findByPositionNameNotIgnoreCase("SUPPLIER")
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -41,6 +43,8 @@ public class EmployeeService {
 
         List<EmployeeResponse> content = page.getContent()
                 .stream()
+                .filter(e -> e.getPosition() != null
+                        && !"SUPPLIER".equalsIgnoreCase(e.getPosition().getName()))
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
 
@@ -48,10 +52,9 @@ public class EmployeeService {
                 content,
                 page.getNumber(),
                 page.getSize(),
-                page.getTotalElements(),
-                page.getTotalPages(),
-                page.isLast()
-        );
+                content.size(), // total filtrado
+                (int) Math.ceil((double) content.size() / page.getSize()),
+                page.isLast());
     }
 
     public EmployeeResponse getById(Long id) {
@@ -59,16 +62,15 @@ public class EmployeeService {
         return mapToResponse(employee);
     }
 
-
     @Transactional
     public EmployeeResponse create(EmployeeRequest request) {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado con id: " + request.getUserId()));
 
         Position position = positionRepository.findById(request.getPositionId())
-                .orElseThrow(() -> new EntityNotFoundException("Puesto no encontrado con id: " + request.getPositionId()));
+                .orElseThrow(
+                        () -> new EntityNotFoundException("Puesto no encontrado con id: " + request.getPositionId()));
 
-        // sincronizar roles base sin perder extras (asume que User.syncRolesWithPosition está implementado)
         user.syncRolesWithPosition(position);
         userRepository.save(user);
 
@@ -92,7 +94,8 @@ public class EmployeeService {
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado con id: " + request.getUserId()));
 
         Position position = positionRepository.findById(request.getPositionId())
-                .orElseThrow(() -> new EntityNotFoundException("Puesto no encontrado con id: " + request.getPositionId()));
+                .orElseThrow(
+                        () -> new EntityNotFoundException("Puesto no encontrado con id: " + request.getPositionId()));
 
         // sincronizar roles base sin perder extras
         user.syncRolesWithPosition(position);
@@ -130,16 +133,34 @@ public class EmployeeService {
         Position pos = employee.getPosition();
         User user = employee.getUser();
 
+        String profileImageUrl = null;
+        if (user.getProfileImageId() != null) {
+            try {
+                profileImageUrl = fileService.getFileUrl(user.getProfileImageId());
+            } catch (Exception e) {
+                profileImageUrl = null;
+            }
+        }
+
         return EmployeeResponse.builder()
                 .id(employee.getId())
                 .userId(user != null ? user.getId() : null)
+
                 .username(user != null ? user.getUsername() : null)
+                .email(user != null ? user.getEmail() : null)
+                .firstName(user != null ? user.getFirstName() : null)
+                .lastName(user != null ? user.getLastName() : null)
                 .fullName(user != null ? user.getFullName() : null)
+                .profileImageUrl(profileImageUrl)
+
+                .positionId(pos != null ? pos.getId() : null)
                 .positionName(pos != null ? pos.getName() : null)
                 .positionDescription(pos != null ? pos.getDescription() : null)
+
                 .salary(employee.getSalary())
                 .status(employee.getStatus() != null ? employee.getStatus().name() : null)
                 .hireDate(employee.getHireDate())
+
                 .createdAt(employee.getCreatedAt())
                 .updatedAt(employee.getUpdatedAt())
                 .createdBy(employee.getCreatedBy())

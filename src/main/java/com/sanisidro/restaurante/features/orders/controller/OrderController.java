@@ -2,7 +2,9 @@ package com.sanisidro.restaurante.features.orders.controller;
 
 import java.util.List;
 
+import com.sanisidro.restaurante.core.security.model.User;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -47,8 +49,10 @@ public class OrderController {
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getMyOrders(
-            @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang) {
-        List<OrderResponse> orders = orderService.getOrdersForCurrentUser(lang);
+            @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang,
+            @AuthenticationPrincipal User user
+    ) {
+        List<OrderResponse> orders = orderService.getOrdersForCurrentUser(user, lang);
         return ResponseEntity.ok(new ApiResponse<>(true, "Órdenes del usuario autenticado obtenidas correctamente", orders));
     }
 

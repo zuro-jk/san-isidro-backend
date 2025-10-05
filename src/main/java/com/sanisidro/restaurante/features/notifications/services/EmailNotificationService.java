@@ -1,33 +1,36 @@
 package com.sanisidro.restaurante.features.notifications.services;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
 import com.sanisidro.restaurante.core.email.dto.request.EmailMessageRequest;
 import com.sanisidro.restaurante.core.email.service.EmailService;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
-import com.sanisidro.restaurante.features.notifications.dto.*;
+import com.sanisidro.restaurante.features.notifications.dto.ContactNotificationEvent;
+import com.sanisidro.restaurante.features.notifications.dto.EmailVerificationEvent;
+import com.sanisidro.restaurante.features.notifications.dto.NotifiableEvent;
+import com.sanisidro.restaurante.features.notifications.dto.OrderNotificationEvent;
+import com.sanisidro.restaurante.features.notifications.dto.ReservationNotificationEvent;
 import com.sanisidro.restaurante.features.notifications.enums.NotificationStatus;
 import com.sanisidro.restaurante.features.notifications.metrics.NotificationMetricsService;
 import com.sanisidro.restaurante.features.notifications.model.EmailNotification;
 import com.sanisidro.restaurante.features.notifications.repository.EmailNotificationRepository;
 import com.sanisidro.restaurante.features.notifications.templates.ContactEmailTemplateBuilder;
 import com.sanisidro.restaurante.features.notifications.templates.EmailTemplateBuilder;
-import com.sanisidro.restaurante.features.notifications.templates.EmailTemplateBuilder.OrderProduct;
 import com.sanisidro.restaurante.features.notifications.templates.EmailVerificationTemplateBuilder;
 import com.sanisidro.restaurante.features.notifications.templates.ReservationEmailTemplateBuilder;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service("EMAIL")
 @RequiredArgsConstructor
 @Slf4j
-public class EmailNotificationService implements NotificationChannel {
+public class EmailNotificationService implements NotificationHandler<NotifiableEvent> {
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
@@ -105,47 +108,37 @@ public class EmailNotificationService implements NotificationChannel {
     private String buildEmailHtml(NotifiableEvent event, User user) {
         String recipientName = user != null ? user.getFullName() : "Cliente";
 
-        if (event instanceof OrderNotificationEvent orderEvent) {
-            List<OrderProduct> products = orderEvent.getProducts() != null
-                    ? orderEvent.getProducts().stream()
-                    .map(p -> new OrderProduct(p.getName(), p.getUnitPrice(), p.getQuantity()))
-                    .collect(Collectors.toList())
-                    : List.of();
-
-            return EmailTemplateBuilder.buildOrderConfirmationEmail(
+        return switch (event.getEventType()) {
+            case "EmailVerificationEvent" -> EmailVerificationTemplateBuilder
+                    .buildVerificationEmail((EmailVerificationEvent) event, recipientName, event.getActionUrl());
+            case "OrderNotificationEvent" -> {
+                OrderNotificationEvent orderEvent = (OrderNotificationEvent) event;
+                List<EmailTemplateBuilder.OrderProduct> products = orderEvent.getProducts() != null
+                        ? orderEvent.getProducts()
+                        : List.of();
+                yield EmailTemplateBuilder.buildOrderConfirmationEmail(
+                        recipientName,
+                        orderEvent.getOrderId(),
+                        products,
+                        orderEvent.getTotal(),
+                        orderEvent.getOrderDate(),
+                        orderEvent.getActionUrl() != null ? orderEvent.getActionUrl() : "#",
+                        orderEvent.getMessage());
+            }
+            case "ReservationNotificationEvent" -> ReservationEmailTemplateBuilder
+                    .buildReservationConfirmationEmail((ReservationNotificationEvent) event, frontendUrl);
+            case "ContactNotificationEvent" -> ContactEmailTemplateBuilder.buildContactEmail(
                     recipientName,
-                    orderEvent.getOrderId(),
-                    products,
-                    orderEvent.getTotal(),
-                    orderEvent.getOrderDate(),
-                    orderEvent.getActionUrl() != null ? orderEvent.getActionUrl() : "#",
-                    orderEvent.getMessage()
-            );
-
-        } else if (event instanceof ReservationNotificationEvent reservationEvent) {
-            return ReservationEmailTemplateBuilder.buildReservationConfirmationEmail(
-                    reservationEvent,
-                    frontendUrl
-            );
-
-        } else if (event instanceof EmailVerificationEvent verificationEvent) {
-            String actionUrl = verificationEvent.getActionUrl();
-            return EmailVerificationTemplateBuilder.buildVerificationEmail(verificationEvent, recipientName, actionUrl);
-        } else if (event instanceof ContactNotificationEvent contactEvent) {
-            return ContactEmailTemplateBuilder.buildContactEmail(
-                    recipientName,                          // senderName
-                    user != null ? user.getEmail() : "N/A", // senderEmail
-                    contactEvent.getSubject(),              // subject
-                    contactEvent.getMessage(),              // message
-                    contactEvent.getActionUrl()             // actionUrl
-            );
-        } else {
-            return EmailTemplateBuilder.buildPromotionEmail(
+                    event.getRecipient(),
+                    ((ContactNotificationEvent) event).getPhone(),
                     event.getSubject(),
                     event.getMessage(),
-                    event.getActionUrl() != null ? event.getActionUrl() : "#"
-            );
-        }
+                    event.getActionUrl());
+            default -> EmailTemplateBuilder.buildPromotionEmail(
+                    event.getSubject(),
+                    event.getMessage(),
+                    event.getActionUrl() != null ? event.getActionUrl() : "#");
+        };
     }
 
     private void sendWithRetries(EmailNotification email, String recipient, String emailHtml) {
@@ -171,7 +164,10 @@ public class EmailNotificationService implements NotificationChannel {
                     notificationMetricsService.incrementFailed("EMAIL", "smtp_error");
                     log.error("❌ No se pudo enviar el correo a {} después de 3 intentos", recipient, ex);
                 }
-                try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ignored) {
+                }
             }
         }
 

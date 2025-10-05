@@ -1,20 +1,22 @@
 package com.sanisidro.restaurante.features.customers.scheduler;
 
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.List;
+
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
 import com.sanisidro.restaurante.features.customers.enums.ReservationStatus;
 import com.sanisidro.restaurante.features.customers.model.Reservation;
 import com.sanisidro.restaurante.features.customers.repository.ReservationRepository;
 import com.sanisidro.restaurante.features.restaurant.enums.TableStatus;
 import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
 import com.sanisidro.restaurante.features.restaurant.repository.TableRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
-
-import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -36,8 +38,7 @@ public class ReservationScheduler {
         List<Reservation> expiredReservations = reservationRepository
                 .findByStatusAndReservationDateOrderByReservationTimeAsc(
                         ReservationStatus.CONFIRMED,
-                        now.toLocalDate()
-                );
+                        now.toLocalDate());
 
         for (Reservation r : expiredReservations) {
             LocalTime reservationTime = r.getReservationTime();
@@ -52,7 +53,7 @@ public class ReservationScheduler {
                 tableRepository.save(table);
 
                 log.info("⚠️ Reserva no-show cancelada automáticamente: id={}, mesa={}, hora={}",
-                        r.getId(), table.getName(), r.getReservationTime());
+                        r.getId(), table.getCode(), r.getReservationTime());
             }
         }
     }

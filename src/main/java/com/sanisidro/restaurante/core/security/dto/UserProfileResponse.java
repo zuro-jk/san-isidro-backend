@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.Set;
 
 @Data
@@ -12,6 +13,7 @@ import java.util.Set;
 @AllArgsConstructor
 @Builder
 public class UserProfileResponse {
+    private Long id;
     private String username;
     private String email;
     private boolean enabled;
@@ -22,5 +24,7 @@ public class UserProfileResponse {
     private String phone;
     private String provider;
     private boolean hasPassword;
-
+    private String profileImageUrl;
+    private LocalDateTime usernameNextChange;
+    private LocalDateTime emailNextChange;
 }

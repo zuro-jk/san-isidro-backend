@@ -1,12 +1,17 @@
 package com.sanisidro.restaurante.core.security.service;
 
 import java.time.Instant;
-import java.util.*;
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-import com.sanisidro.restaurante.core.security.dto.*;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -15,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.sanisidro.restaurante.core.aws.service.FileService;
 import com.sanisidro.restaurante.core.exceptions.EmailAlreadyExistsException;
 import com.sanisidro.restaurante.core.exceptions.InvalidCredentialsException;
 import com.sanisidro.restaurante.core.exceptions.InvalidRefreshTokenException;
@@ -22,6 +28,11 @@ import com.sanisidro.restaurante.core.exceptions.InvalidVerificationCodeExceptio
 import com.sanisidro.restaurante.core.exceptions.TooManyAttemptsException;
 import com.sanisidro.restaurante.core.exceptions.UserNotFoundException;
 import com.sanisidro.restaurante.core.exceptions.UsernameAlreadyExistsException;
+import com.sanisidro.restaurante.core.security.dto.AuthResponse;
+import com.sanisidro.restaurante.core.security.dto.LoginRequest;
+import com.sanisidro.restaurante.core.security.dto.RegisterRequest;
+import com.sanisidro.restaurante.core.security.dto.UserProfileResponse;
+import com.sanisidro.restaurante.core.security.dto.UserSessionResponse;
 import com.sanisidro.restaurante.core.security.jwt.JwtService;
 import com.sanisidro.restaurante.core.security.model.RefreshToken;
 import com.sanisidro.restaurante.core.security.model.Role;
@@ -32,6 +43,7 @@ import com.sanisidro.restaurante.core.security.repository.UserRepository;
 import com.sanisidro.restaurante.features.notifications.dto.EmailVerificationEvent;
 import com.sanisidro.restaurante.features.notifications.kafka.NotificationProducer;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -51,6 +63,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final FileService fileService;
 
     private final NotificationProducer notificationProducer;
 
@@ -97,18 +110,7 @@ public class AuthService {
                     .map(Role::getName)
                     .collect(Collectors.toSet());
 
-            UserProfileResponse profile = UserProfileResponse.builder()
-                    .username(user.getUsername())
-                    .email(user.getEmail())
-                    .enabled(user.isEnabled())
-                    .roles(roles)
-                    .firstName(user.getFirstName())
-                    .lastName(user.getLastName())
-                    .fullName(user.getFullName())
-                    .phone(user.getPhone())
-                    .provider(user.getProvider().name())
-                    .hasPassword(user.getPassword() != null && !user.getPassword().isEmpty())
-                    .build();
+            UserProfileResponse profile = buildUserProfileResponse(user);
 
             return new AuthResponse(
                     jwtService.generateAccessToken(user.getUsername(), Collections.emptyMap()),
@@ -126,7 +128,7 @@ public class AuthService {
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new UsernameAlreadyExistsException("Username ya existe");
         }
-        if (userRepository.existsByEmail(request.getEmail())) {
+        if (userRepository.existsByEmailIgnoreCase(request.getEmail())) {
             throw new EmailAlreadyExistsException("Email ya existe");
         }
 
@@ -194,25 +196,13 @@ public class AuthService {
                 .map(Role::getName)
                 .collect(Collectors.toSet());
 
-        UserProfileResponse profile = UserProfileResponse.builder()
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .enabled(user.isEnabled())
-                .roles(roles)
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .fullName(user.getFullName())
-                .phone(user.getPhone())
-                .provider(user.getProvider().name())
-                .hasPassword(user.getPassword() != null && !user.getPassword().isEmpty())
-                .build();
+        UserProfileResponse profile = buildUserProfileResponse(user);
 
         return new AuthResponse(
                 newAccessToken,
                 newRefreshToken.getId().toString(),
                 profile);
     }
-
 
     @Transactional
     public void logoutAll(String accessToken, String clientIp, String userAgent) {
@@ -269,8 +259,7 @@ public class AuthService {
                         rt.getId().toString(),
                         rt.getExpiryDate(),
                         rt.getIp(),
-                        rt.getUserAgent()
-                ))
+                        rt.getUserAgent()))
                 .collect(Collectors.toList());
     }
 
@@ -297,5 +286,45 @@ public class AuthService {
         }
     }
 
+    private UserProfileResponse buildUserProfileResponse(User user) {
+        Set<String> roles = user.getRoles().stream()
+                .map(Role::getName)
+                .collect(Collectors.toSet());
+
+        String profileImageUrl = null;
+        if (user.getProfileImageId() != null) {
+            try {
+                profileImageUrl = fileService.getFileUrl(user.getProfileImageId());
+            } catch (Exception e) {
+                profileImageUrl = null; // Si falla, dejamos null
+            }
+        }
+
+        LocalDateTime usernameNextChange = null;
+        if (user.getLastUsernameChange() != null) {
+            usernameNextChange = user.getLastUsernameChange().plusDays(7);
+        }
+
+        LocalDateTime emailNextChange = null;
+        if (user.getLastEmailChange() != null) {
+            emailNextChange = user.getLastEmailChange().plusDays(30);
+        }
+
+        return UserProfileResponse.builder()
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .enabled(user.isEnabled())
+                .roles(roles)
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .fullName(user.getFullName())
+                .phone(user.getPhone())
+                .provider(user.getProvider().name())
+                .hasPassword(user.getPassword() != null && !user.getPassword().isEmpty())
+                .profileImageUrl(profileImageUrl)
+                .usernameNextChange(usernameNextChange)
+                .emailNextChange(emailNextChange)
+                .build();
+    }
 
 }

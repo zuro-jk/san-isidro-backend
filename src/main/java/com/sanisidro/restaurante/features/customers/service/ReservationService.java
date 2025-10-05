@@ -11,10 +11,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.sanisidro.restaurante.core.config.ReservationProperties;
-import com.sanisidro.restaurante.core.security.model.User;
-import com.sanisidro.restaurante.features.customers.dto.reservation.request.AuthenticatedReservationRequest;
-import com.sanisidro.restaurante.features.customers.dto.reservation.request.BaseReservationRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -22,9 +18,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.sanisidro.restaurante.core.config.ReservationProperties;
 import com.sanisidro.restaurante.core.dto.response.PagedResponse;
 import com.sanisidro.restaurante.core.exceptions.InvalidReservationException;
 import com.sanisidro.restaurante.core.exceptions.ResourceNotFoundException;
+import com.sanisidro.restaurante.core.security.model.User;
+import com.sanisidro.restaurante.features.customers.dto.reservation.request.AuthenticatedReservationRequest;
+import com.sanisidro.restaurante.features.customers.dto.reservation.request.BaseReservationRequest;
 import com.sanisidro.restaurante.features.customers.dto.reservation.request.ReservationRequest;
 import com.sanisidro.restaurante.features.customers.dto.reservation.response.ReservationResponse;
 import com.sanisidro.restaurante.features.customers.enums.PointHistoryEventType;
@@ -94,7 +94,7 @@ public class ReservationService {
         }
 
         log.info("✅ Reserva creada: id={}, cliente={}, mesa={}, fecha={}, hora={}, status={}",
-                saved.getId(), customer.getId(), table.getName(),
+                saved.getId(), customer.getId(), table.getCode(),
                 saved.getReservationDate(), saved.getReservationTime(), saved.getStatus());
 
         return mapToResponse(saved);
@@ -159,7 +159,7 @@ public class ReservationService {
         log.info("🚶 Walk-in creado: id={}, cliente={}, mesa={}, fecha={}, hora={}",
                 saved.getId(),
                 saved.getCustomer().getUser().getFullName(),
-                saved.getTable().getName(),
+                saved.getTable().getCode(),
                 saved.getReservationDate(),
                 saved.getReservationTime());
 
@@ -210,7 +210,7 @@ public class ReservationService {
         log.info("🚀 Walk-in automático creado: id={}, cliente={}, mesa={}, fecha={}, hora={}",
                 saved.getId(),
                 saved.getCustomer().getUser().getFullName(),
-                saved.getTable().getName(),
+                saved.getTable().getCode(),
                 saved.getReservationDate(),
                 saved.getReservationTime());
 
@@ -287,7 +287,7 @@ public class ReservationService {
         }
 
         log.info("✏️ Reserva actualizada: id={}, cliente={}, mesa={}, fecha={}, hora={}",
-                updated.getId(), customer.getId(), newTable.getName(),
+                updated.getId(), customer.getId(), newTable.getCode(),
                 updated.getReservationDate(), updated.getReservationTime());
 
         return mapToResponse(updated);
@@ -319,7 +319,7 @@ public class ReservationService {
         }
 
         log.info("🏁 Reserva completada: id={}, cliente={}, mesa={}, fecha={}, hora={}, puntos={}",
-                reservation.getId(), customer.getId(), table.getName(),
+                reservation.getId(), customer.getId(), table.getCode(),
                 reservation.getReservationDate(), reservation.getReservationTime(), points);
 
         return mapToResponse(reservation);
@@ -341,7 +341,7 @@ public class ReservationService {
         log.info("✅ Reserva confirmada: id={}, cliente={}, mesa={}, fecha={}, hora={}, status={}",
                 reservation.getId(),
                 reservation.getCustomer().getId(),
-                table.getName(),
+                table.getCode(),
                 reservation.getReservationDate(),
                 reservation.getReservationTime(),
                 reservation.getStatus());
@@ -365,7 +365,7 @@ public class ReservationService {
         tableRepository.save(table);
 
         log.info("❌ Reserva cancelada: id={}, cliente={}, mesa={}, fecha={}, hora={}",
-                reservation.getId(), reservation.getCustomer().getId(), table.getName(),
+                reservation.getId(), reservation.getCustomer().getId(), table.getCode(),
                 reservation.getReservationDate(), reservation.getReservationTime());
 
         return mapToResponse(reservation);
@@ -381,7 +381,7 @@ public class ReservationService {
 
     /* -------------------- VALIDATIONS -------------------- */
     private void validateReservationFields(BaseReservationRequest dto, TableEntity table, Long currentReservationId,
-                                           boolean isWalkIn) {
+            boolean isWalkIn) {
 
         if (dto.getNumberOfPeople() <= 0)
             throw new InvalidReservationException("El número de personas debe ser mayor a 0");
@@ -411,7 +411,8 @@ public class ReservationService {
 
         // Horario de la mesa con buffers
         ZonedDateTime reservationStart = reservationDateTime.minusMinutes(bufferBefore);
-        ZonedDateTime reservationEnd = reservationDateTime.plusMinutes(table.getReservationDurationMinutes() + bufferAfter);
+        ZonedDateTime reservationEnd = reservationDateTime
+                .plusMinutes(table.getReservationDurationMinutes() + bufferAfter);
 
         ZonedDateTime tableOpen = ZonedDateTime.of(dto.getReservationDate(), table.getOpenTime(), RESTAURANT_ZONE);
         ZonedDateTime tableClose = ZonedDateTime.of(dto.getReservationDate(), table.getCloseTime(), RESTAURANT_ZONE);
@@ -449,7 +450,6 @@ public class ReservationService {
         }
     }
 
-
     private void validateStateTransition(Reservation reservation, ReservationStatus newStatus) {
         if (ALLOWED_TRANSITIONS.getOrDefault(reservation.getStatus(), Set.of()).contains(newStatus))
             return;
@@ -472,7 +472,6 @@ public class ReservationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Mesa no encontrada"));
     }
 
-
     /**
      * Encuentra la mejor mesa libre para walk-in según número de personas y fecha.
      */
@@ -484,7 +483,8 @@ public class ReservationService {
                 .filter(t -> numberOfPeople >= t.getMinCapacity() && numberOfPeople <= t.getCapacity())
                 .sorted(Comparator.comparingInt(TableEntity::getCapacity))
                 .filter(table -> {
-                    LocalTime startTime = now.toLocalTime().isBefore(table.getOpenTime()) ? table.getOpenTime() : now.toLocalTime();
+                    LocalTime startTime = now.toLocalTime().isBefore(table.getOpenTime()) ? table.getOpenTime()
+                            : now.toLocalTime();
                     ReservationRequest dto = new ReservationRequest();
                     dto.setNumberOfPeople(numberOfPeople);
                     dto.setReservationDate(date);
@@ -497,7 +497,8 @@ public class ReservationService {
                     }
                 })
                 .findFirst()
-                .orElseThrow(() -> new InvalidReservationException("No hay mesas disponibles para walk-in en este momento"));
+                .orElseThrow(
+                        () -> new InvalidReservationException("No hay mesas disponibles para walk-in en este momento"));
     }
 
     @Transactional
@@ -515,8 +516,7 @@ public class ReservationService {
             table = findBestTableForNumberOfPeople(
                     dto.getNumberOfPeople(),
                     dto.getReservationDate(),
-                    dto.getReservationTime()
-            );
+                    dto.getReservationTime());
             dto.setTableId(table.getId());
         } else {
             table = findTableById(dto.getTableId());
@@ -542,7 +542,7 @@ public class ReservationService {
         }
 
         log.info("✅ Reserva creada por usuario autenticado: id={}, cliente={}, mesa={}, fecha={}, hora={}, status={}",
-                saved.getId(), customer.getId(), table.getName(),
+                saved.getId(), customer.getId(), table.getCode(),
                 saved.getReservationDate(), saved.getReservationTime(), saved.getStatus());
 
         return mapToResponse(saved);
@@ -575,23 +575,26 @@ public class ReservationService {
 
     private void publishReservationNotification(Reservation reservation, String action) {
         try {
+            String tableAlias = reservation.getTable().getAlias(); // amigable para el usuario
+            String tableCode = reservation.getTable().getCode(); // identificador técnico
+
             ReservationNotificationEvent event = ReservationNotificationEvent.builder()
                     .userId(reservation.getCustomer().getId())
                     .recipient(reservation.getCustomer().getUser().getEmail())
-                    .subject("Reserva " + action + " - " + reservation.getTable().getName())
+                    .subject("Reserva " + action + " - " + tableAlias)
                     .message("Hola " + reservation.getCustomer().getUser().getFullName() + ",\n\n" +
-                            "Tu reserva para " + reservation.getNumberOfPeople() + " personas en la mesa " +
-                            reservation.getTable().getName() + " ha sido " + action.toLowerCase() + ".\n" +
+                            "Tu reserva para " + reservation.getNumberOfPeople() + " personas en la " +
+                            tableAlias + " (" + tableCode + ") ha sido " + action.toLowerCase() + ".\n" +
                             "Fecha: " + reservation.getReservationDate() + "\n" +
                             "Hora: " + reservation.getReservationTime() + "\n\n" +
-                            "Gracias por elegirnos!")
+                            "¡Gracias por elegirnos!")
                     .reservationId(reservation.getId())
                     .reservationDate(
                             LocalDateTime.of(reservation.getReservationDate(), reservation.getReservationTime()))
                     .reservationTime(reservation.getReservationTime().toString())
                     .numberOfPeople(reservation.getNumberOfPeople())
                     .customerName(reservation.getCustomer().getUser().getFullName())
-                    .tableName(reservation.getTable().getName())
+                    .tableName(tableAlias) // aquí mejor mostrar alias
                     .actionUrl("https://miapp.com/reservations/" + reservation.getId())
                     .build();
 
@@ -629,7 +632,7 @@ public class ReservationService {
                 .customerName(
                         reservation.getCustomer() != null ? reservation.getCustomer().getUser().getFullName() : null)
                 .tableId(reservation.getTable() != null ? reservation.getTable().getId() : null)
-                .tableNumber(reservation.getTable() != null ? reservation.getTable().getName() : null)
+                .tableNumber(reservation.getTable() != null ? reservation.getTable().getCode() : null)
                 .contactName(reservation.getContactName())
                 .contactPhone(reservation.getContactPhone())
                 .reservationDate(reservation.getReservationDate())

@@ -1,40 +1,43 @@
 package com.sanisidro.restaurante.features.notifications.facade;
 
-import com.sanisidro.restaurante.features.notifications.dto.*;
-import com.sanisidro.restaurante.features.notifications.services.NotificationChannel;
-import lombok.RequiredArgsConstructor;
+import java.util.Map;
+
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
+import com.sanisidro.restaurante.features.notifications.dto.NotifiableEvent;
+import com.sanisidro.restaurante.features.notifications.services.NotificationHandler;
+
+import lombok.RequiredArgsConstructor;
 
 @Component
 @RequiredArgsConstructor
 public class NotificationFacade {
 
-    private final Map<String, NotificationChannel> channels;
+    /**
+     * Mapa de handlers por canal y tipo de evento
+     * Map<Canal, Map<TipoEvento, Handler>>
+     */
+    private final Map<String, Map<String, NotificationHandler<? extends NotifiableEvent>>> handlers;
 
+    /**
+     * Procesa un evento y lo enruta al handler correspondiente
+     */
     public void processNotification(NotifiableEvent event) {
-        String channelKey;
+        String channelKey = event.getChannelKey().toUpperCase();
+        Map<String, NotificationHandler<? extends NotifiableEvent>> channelHandlers = handlers.get(channelKey);
 
-        if (event instanceof OrderNotificationEvent) {
-            channelKey = "EMAIL";
-        } else if (event instanceof ReservationNotificationEvent) {
-            channelKey = "EMAIL";
-        } else if (event instanceof StockLowNotificationEvent) {
-            channelKey = "WEBSOCKET";
-        } else if (event instanceof EmailVerificationEvent) {
-            channelKey = "EMAIL";
-        } else if (event instanceof ContactNotificationEvent) {
-            channelKey = "EMAIL";
-        } else {
-            throw new IllegalArgumentException("Evento de notificación no soportado: " + event.getClass().getSimpleName());
+        if (channelHandlers == null) {
+            throw new IllegalArgumentException("No se encontró handlers para el canal: " + channelKey);
         }
 
-        NotificationChannel channel = channels.get(channelKey.toUpperCase());
-        if (channel == null) {
-            throw new IllegalArgumentException("Tipo de notificación no soportado: " + channelKey);
+        String eventType = event.getEventType();
+        NotificationHandler handler = channelHandlers.get(eventType);
+
+        if (handler == null) {
+            throw new IllegalArgumentException(
+                    "No se encontró un handler para el evento " + eventType + " en el canal " + channelKey);
         }
 
-        channel.send(event);
+        handler.send(event);
     }
 }

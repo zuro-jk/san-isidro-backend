@@ -20,8 +20,11 @@ public class TableEntity {
     @Column(name = "table_id")
     private Long id;
 
-    @Column(name = "name", length = 50, nullable = false)
-    private String name;
+    @Column(name = "code", length = 20, nullable = false, unique = true)
+    private String code;
+
+    @Column(name = "alias", length = 100)
+    private String alias;
 
     @Column(name = "capacity", nullable = false)
     private Integer capacity;

@@ -199,4 +199,11 @@ public class FileService {
             throw new RuntimeException("SHA-256 no soportado", e);
         }
     }
+
+    public String getFileUrl(Long fileId) {
+        FileMetadata file = fileRepository.findById(fileId)
+                .orElseThrow(() -> new FileNotFoundException("Archivo no encontrado con id: " + fileId));
+        return file.getUrl();
+    }
+
 }

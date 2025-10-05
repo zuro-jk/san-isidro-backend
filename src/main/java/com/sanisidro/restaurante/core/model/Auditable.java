@@ -1,11 +1,8 @@
 package com.sanisidro.restaurante.core.model;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.Map;
 
-import com.sanisidro.restaurante.features.customers.model.Customer;
-import jakarta.persistence.*;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
@@ -14,6 +11,14 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import com.sanisidro.restaurante.core.audit.listener.AuditableEntityListener;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.EntityListeners;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.Transient;
 import lombok.Getter;
 import lombok.Setter;
 

@@ -159,4 +159,14 @@ public class GlobalExceptionHandler {
         return buildResponse(ex.getMessage(), HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(UsernameChangeNotAllowedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleUsernameChangeNotAllowed(UsernameChangeNotAllowedException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(EmailChangeNotAllowedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleEmailChangeNotAllowed(EmailChangeNotAllowedException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.BAD_REQUEST);
+    }
+
 }

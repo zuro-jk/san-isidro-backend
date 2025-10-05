@@ -1,8 +1,12 @@
 package com.sanisidro.restaurante.features.notifications.model;
 
-import com.sanisidro.restaurante.core.security.model.User;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 @Entity
@@ -12,7 +16,7 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder
-public class EmailNotification extends Notification{
+public class EmailNotification extends Notification {
 
     @Column(name = "subject", nullable = false)
     private String subject;
