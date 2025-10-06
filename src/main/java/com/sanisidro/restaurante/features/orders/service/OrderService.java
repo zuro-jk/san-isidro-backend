@@ -420,10 +420,10 @@ public class OrderService {
     }
 
     private String normalizeLang(String lang) {
-        if (lang == null || lang.isEmpty()) return "es"; // default
+        if (lang == null || lang.isEmpty()) return "es";
         if (lang.startsWith("es")) return "es";
         if (lang.startsWith("en")) return "en";
-        return "es"; // fallback
+        return "es";
     }
 
     private String getStatusName(OrderStatus status, String lang) {

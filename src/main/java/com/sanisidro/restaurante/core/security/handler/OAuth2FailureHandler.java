@@ -26,17 +26,14 @@ public class OAuth2FailureHandler implements AuthenticationFailureHandler {
 
         String errorMessage = exception.getMessage() != null ? exception.getMessage() : "unknown_error";
 
-        // 🚨 Log del fallo
         log.error("❌ OAuth2 login failed: {}", errorMessage, exception);
 
-        // Crear objeto de error
         Map<String, Object> errorResponse = Map.of(
                 "success", false,
                 "message", "OAuth2 login failed: " + errorMessage,
                 "data", null
         );
 
-        // 🚀 Enviar mensaje de error al frontend (popup -> opener)
         String script = """
             <html><body><script>
                 window.opener.postMessage(

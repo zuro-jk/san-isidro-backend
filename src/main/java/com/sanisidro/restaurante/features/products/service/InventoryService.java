@@ -1,8 +1,21 @@
 package com.sanisidro.restaurante.features.products.service;
 
+import java.math.BigDecimal;
+import java.util.Date;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.sanisidro.restaurante.features.products.dto.inventory.request.AddStockRequest;
 import com.sanisidro.restaurante.features.products.dto.inventory.request.InventoryCreateRequest;
 import com.sanisidro.restaurante.features.products.dto.inventory.request.InventoryUpdateRequest;
+import com.sanisidro.restaurante.features.products.dto.inventory.response.InventoryDetailResponse;
 import com.sanisidro.restaurante.features.products.dto.inventory.response.InventoryResponse;
+import com.sanisidro.restaurante.features.products.dto.inventorymovement.request.InventoryMovementRequest;
+import com.sanisidro.restaurante.features.products.dto.inventorymovement.response.InventoryMovementResponse;
+import com.sanisidro.restaurante.features.products.enums.MovementSource;
+import com.sanisidro.restaurante.features.products.enums.MovementType;
 import com.sanisidro.restaurante.features.products.exceptions.IngredientNotFoundException;
 import com.sanisidro.restaurante.features.products.exceptions.InventoryAlreadyExistsException;
 import com.sanisidro.restaurante.features.products.exceptions.InventoryNotFoundException;
@@ -10,17 +23,14 @@ import com.sanisidro.restaurante.features.products.model.Ingredient;
 import com.sanisidro.restaurante.features.products.model.Inventory;
 import com.sanisidro.restaurante.features.products.repository.IngredientRepository;
 import com.sanisidro.restaurante.features.products.repository.InventoryRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.util.List;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 public class InventoryService {
 
+    private final InventoryMovementService movementService;
     private final InventoryRepository inventoryRepository;
     private final IngredientRepository ingredientRepository;
 
@@ -31,16 +41,31 @@ public class InventoryService {
                 .toList();
     }
 
-    public InventoryResponse getById(Long id) {
+    public InventoryDetailResponse getById(Long id) {
         Inventory inventory = inventoryRepository.findById(id)
                 .orElseThrow(() -> new InventoryNotFoundException("Inventario no encontrado con id: " + id));
-        return mapToResponse(inventory);
+
+        List<InventoryMovementResponse> movements = movementService.getAllByInventoryId(inventory.getId());
+
+        return InventoryDetailResponse.builder()
+                .inventory(mapToResponse(inventory))
+                .movements(movements)
+                .build();
     }
 
-    public InventoryResponse getByIngredient(Long ingredientId) {
+    public InventoryDetailResponse getByIngredient(Long ingredientId) {
+        InventoryDetailResponse inventoryDetail = new InventoryDetailResponse();
+
         Inventory inventory = inventoryRepository.findByIngredientId(ingredientId)
-                .orElseThrow(() -> new InventoryNotFoundException("Inventario no encontrado para el ingrediente id: " + ingredientId));
-        return mapToResponse(inventory);
+                .orElseThrow(() -> new InventoryNotFoundException(
+                        "Inventario no encontrado para el ingrediente id: " + ingredientId));
+
+        List<InventoryMovementResponse> movements = movementService.getAllByInventoryId(inventory.getId());
+
+        inventoryDetail.setInventory(mapToResponse(inventory));
+        inventoryDetail.setMovements(movements);
+
+        return inventoryDetail;
     }
 
     @Transactional
@@ -49,14 +74,12 @@ public class InventoryService {
 
         Ingredient ingredient = ingredientRepository.findById(request.getIngredientId())
                 .orElseThrow(() -> new IngredientNotFoundException(
-                        "Ingrediente no encontrado con id: " + request.getIngredientId()
-                ));
+                        "Ingrediente no encontrado con id: " + request.getIngredientId()));
 
         inventoryRepository.findByIngredientId(request.getIngredientId())
                 .ifPresent(inv -> {
                     throw new InventoryAlreadyExistsException(
-                            "Ya existe un inventario para el ingrediente con id: " + request.getIngredientId()
-                    );
+                            "Ya existe un inventario para el ingrediente con id: " + request.getIngredientId());
                 });
 
         Inventory inventory = Inventory.builder()
@@ -80,6 +103,29 @@ public class InventoryService {
         inventory.setMinimumStock(request.getMinimumStock());
 
         Inventory updatedInventory = inventoryRepository.save(inventory);
+        return mapToResponse(updatedInventory);
+    }
+
+    @Transactional
+    public InventoryResponse addStock(Long id, AddStockRequest request) {
+        Inventory inventory = inventoryRepository.findById(id)
+                .orElseThrow(() -> new InventoryNotFoundException("Inventario no encontrado con id: " + id));
+
+        InventoryMovementRequest movementRequest = InventoryMovementRequest.builder()
+                .ingredientId(inventory.getIngredient().getId())
+                .type(MovementType.ENTRY)
+                .quantity(request.getQuantity())
+                .reason(request.getReason())
+                .date(new Date().toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime())
+                .source(MovementSource.MANUAL)
+                .referenceId(null)
+                .build();
+
+        movementService.create(movementRequest);
+
+        Inventory updatedInventory = inventoryRepository.findById(id)
+                .orElseThrow(() -> new InventoryNotFoundException("Inventario no encontrado con id: " + id));
+
         return mapToResponse(updatedInventory);
     }
 

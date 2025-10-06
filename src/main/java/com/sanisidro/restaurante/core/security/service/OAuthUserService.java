@@ -58,7 +58,6 @@ public class OAuthUserService {
             Optional<User> userByEmail = userRepository.findByEmailIgnoreCase(normalizedEmail);
 
             if (userByEmail.isPresent()) {
-                // Usuario existente con email, actualizar provider
                 user = userByEmail.get();
 
                 switch (provider.toLowerCase()) {
@@ -78,20 +77,17 @@ public class OAuthUserService {
 
                 userRepository.save(user);
             } else {
-                // Crear nuevo usuario OAuth
                 user = createUserFromOAuth(provider, providerId, normalizedEmail,
                         firstName, lastName, emailVerified, profileImageUrl);
             }
         }
 
-        // Generar tokens
         String accessToken = jwtService.generateAccessToken(
                 user.getUsername(),
                 Map.of("roles", user.getRoles().stream().map(Role::getName).toList()));
 
         RefreshToken refreshTokenEntity = createRefreshToken(user);
 
-        // Construir profile image
         String finalProfileImageUrl = profileImageUrl;
         if (user.getProfileImageId() != null) {
             try {
@@ -101,7 +97,6 @@ public class OAuthUserService {
             }
         }
 
-        // Construir response
         UserProfileResponse userProfile = UserProfileResponse.builder()
                 .username(user.getUsername())
                 .email(user.getEmail())
@@ -139,7 +134,6 @@ public class OAuthUserService {
         User user = new User();
         user.setEmail(email);
 
-        // Generar username único para evitar duplicados
         String baseUsername = provider.toLowerCase() + "_" + providerId;
         String username = baseUsername;
         int counter = 1;
@@ -148,7 +142,6 @@ public class OAuthUserService {
         }
         user.setUsername(username);
 
-        // Nombres
         if (firstName == null && lastName == null) {
             user.setFirstName(email.split("@")[0]);
             user.setLastName("");
@@ -165,7 +158,6 @@ public class OAuthUserService {
         user.setPassword(null);
         user.setEmailVerified(emailVerified != null && emailVerified);
 
-        // Provider
         switch (provider.toLowerCase()) {
             case "google" -> {
                 user.setProvider(AuthProvider.GOOGLE);

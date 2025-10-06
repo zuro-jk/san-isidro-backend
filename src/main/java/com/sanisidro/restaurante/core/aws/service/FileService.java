@@ -39,7 +39,7 @@ public class FileService {
         if (size.endsWith("MB")) return Long.parseLong(size.replace("MB", "")) * 1024 * 1024;
         if (size.endsWith("KB")) return Long.parseLong(size.replace("KB", "")) * 1024;
         if (size.endsWith("B")) return Long.parseLong(size.replace("B", ""));
-        return 5 * 1024 * 1024; // default 5MB
+        return 5 * 1024 * 1024;
     }
 
     public FileMetadata uploadFile(MultipartFile file, String folder) {
@@ -48,16 +48,13 @@ public class FileService {
 
         File tempFile = null;
         try {
-            // Crear archivo temporal
             tempFile = File.createTempFile("upload-", file.getOriginalFilename());
             file.transferTo(tempFile);
 
-            // Subir a S3 desde tempFile
             String key = s3Service.uploadFile(tempFile, folder, file.getContentType());
             String url = s3Service.getFileUrl(key);
             User currentUser = getCurrentUser();
 
-            // Metadata base
             FileMetadata metadata = FileMetadata.builder()
                     .originalName(file.getOriginalFilename())
                     .key(key)
@@ -71,7 +68,6 @@ public class FileService {
             Integer height = null;
             BigDecimal duration = null;
 
-            // Calcular checksum siempre desde tempFile
             String checksum = calculateChecksum(new FileInputStream(tempFile));
 
             String contentType = file.getContentType();

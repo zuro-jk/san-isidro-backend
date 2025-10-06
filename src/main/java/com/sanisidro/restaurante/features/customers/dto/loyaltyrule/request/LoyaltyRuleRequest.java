@@ -22,7 +22,7 @@ public class LoyaltyRuleRequest {
     @Min(value = 0, message = "Los puntos deben ser mayores o iguales a 0")
     private Integer points;
 
-    private Double minPurchaseAmount; // opcional, solo para reglas de tipo PURCHASE
+    private Double minPurchaseAmount;
 
     @NotNull(message = "El estado activo es obligatorio")
     private Boolean active;
@@ -31,5 +31,5 @@ public class LoyaltyRuleRequest {
     private Boolean perPerson;
 
     @NotNull(message = "El tipo de regla es obligatorio")
-    private LoyaltyRuleType type; // obligatorio
+    private LoyaltyRuleType type;
 }

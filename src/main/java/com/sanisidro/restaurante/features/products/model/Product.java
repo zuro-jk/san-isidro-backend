@@ -24,6 +24,9 @@ public class Product {
     @Column(name = "name", nullable = false)
     private String name;
 
+    @Column(name = "description", columnDefinition = "text")
+    private String description;
+
     @Column(name = "price", precision = 10, scale = 2, nullable = false)
     private BigDecimal price;
 

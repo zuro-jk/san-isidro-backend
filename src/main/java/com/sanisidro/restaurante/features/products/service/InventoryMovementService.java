@@ -1,23 +1,28 @@
 package com.sanisidro.restaurante.features.products.service;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.sanisidro.restaurante.features.products.dto.inventorymovement.request.InventoryMovementBatchRequest;
 import com.sanisidro.restaurante.features.products.dto.inventorymovement.request.InventoryMovementRequest;
 import com.sanisidro.restaurante.features.products.dto.inventorymovement.response.InventoryMovementResponse;
 import com.sanisidro.restaurante.features.products.enums.MovementType;
-import com.sanisidro.restaurante.features.products.exceptions.*;
+import com.sanisidro.restaurante.features.products.exceptions.IngredientNotFoundException;
+import com.sanisidro.restaurante.features.products.exceptions.InvalidMovementTypeException;
+import com.sanisidro.restaurante.features.products.exceptions.InvalidQuantityException;
+import com.sanisidro.restaurante.features.products.exceptions.InventoryNotFoundException;
+import com.sanisidro.restaurante.features.products.model.Ingredient;
 import com.sanisidro.restaurante.features.products.model.Inventory;
 import com.sanisidro.restaurante.features.products.model.InventoryMovement;
-import com.sanisidro.restaurante.features.products.model.Ingredient;
+import com.sanisidro.restaurante.features.products.repository.IngredientRepository;
 import com.sanisidro.restaurante.features.products.repository.InventoryMovementRepository;
 import com.sanisidro.restaurante.features.products.repository.InventoryRepository;
-import com.sanisidro.restaurante.features.products.repository.IngredientRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -36,7 +41,21 @@ public class InventoryMovementService {
 
     public List<InventoryMovementResponse> getByIngredient(Long ingredientId) {
         ingredientRepository.findById(ingredientId)
-                .orElseThrow(() -> new IngredientNotFoundException("Ingrediente no encontrado con id: " + ingredientId));
+                .orElseThrow(
+                        () -> new IngredientNotFoundException("Ingrediente no encontrado con id: " + ingredientId));
+
+        return movementRepository.findByIngredientId(ingredientId)
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    public List<InventoryMovementResponse> getAllByInventoryId(Long inventoryId) {
+        Inventory inventory = inventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new InventoryNotFoundException(
+                        "Inventario no encontrado con id: " + inventoryId));
+
+        Long ingredientId = inventory.getIngredient().getId();
 
         return movementRepository.findByIngredientId(ingredientId)
                 .stream()
@@ -58,10 +77,12 @@ public class InventoryMovementService {
             validateRequest(request);
 
             Ingredient ingredient = ingredientRepository.findById(request.getIngredientId())
-                    .orElseThrow(() -> new IngredientNotFoundException("Ingrediente no encontrado con id: " + request.getIngredientId()));
+                    .orElseThrow(() -> new IngredientNotFoundException(
+                            "Ingrediente no encontrado con id: " + request.getIngredientId()));
 
             Inventory inventory = inventoryRepository.findByIngredientId(request.getIngredientId())
-                    .orElseThrow(() -> new InventoryNotFoundException("Inventario no encontrado para el ingrediente id: " + request.getIngredientId()));
+                    .orElseThrow(() -> new InventoryNotFoundException(
+                            "Inventario no encontrado para el ingrediente id: " + request.getIngredientId()));
 
             applyStockChange(inventory, request);
 
@@ -86,13 +107,16 @@ public class InventoryMovementService {
 
     private void validateRequest(InventoryMovementRequest request) {
         if (request.getQuantity() == null || request.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidQuantityException("La cantidad debe ser mayor a cero para ingredienteId: " + request.getIngredientId());
+            throw new InvalidQuantityException(
+                    "La cantidad debe ser mayor a cero para ingredienteId: " + request.getIngredientId());
         }
         if (request.getType() == null) {
-            throw new InvalidMovementTypeException("Tipo de movimiento es obligatorio para ingredienteId: " + request.getIngredientId());
+            throw new InvalidMovementTypeException(
+                    "Tipo de movimiento es obligatorio para ingredienteId: " + request.getIngredientId());
         }
         if (request.getSource() == null) {
-            throw new IllegalArgumentException("El origen del movimiento es obligatorio para ingredienteId: " + request.getIngredientId());
+            throw new IllegalArgumentException(
+                    "El origen del movimiento es obligatorio para ingredienteId: " + request.getIngredientId());
         }
     }
 
@@ -103,7 +127,8 @@ public class InventoryMovementService {
         switch (type) {
             case ENTRY -> inventory.increaseStock(qty);
             case EXIT -> inventory.decreaseStock(qty);
-            default -> throw new InvalidMovementTypeException("Tipo de movimiento no válido para ingredienteId: " + request.getIngredientId());
+            default -> throw new InvalidMovementTypeException(
+                    "Tipo de movimiento no válido para ingredienteId: " + request.getIngredientId());
         }
     }
 

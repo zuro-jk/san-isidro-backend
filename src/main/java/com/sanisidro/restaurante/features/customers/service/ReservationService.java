@@ -110,13 +110,11 @@ public class ReservationService {
         LocalTime startTime;
 
         if (tableId == null) {
-            // Para walk-in sin mesa específica, buscamos la mejor disponible
             table = findBestTableForWalkIn(numberOfPeople, now.toLocalDate());
             startTime = now.toLocalTime().isBefore(table.getOpenTime()) ? table.getOpenTime() : now.toLocalTime();
         } else {
             table = findTableById(tableId);
 
-            // Validar que la mesa pueda recibir walk-in ahora
             startTime = now.toLocalTime().isBefore(table.getOpenTime()) ? table.getOpenTime() : now.toLocalTime();
             LocalTime reservationEnd = startTime
                     .plusMinutes(table.getReservationDurationMinutes() + table.getBufferAfterMinutes());
@@ -135,7 +133,6 @@ public class ReservationService {
         dto.setReservationTime(startTime);
         dto.setStatus(ReservationStatus.CONFIRMED);
 
-        // Validación de disponibilidad y horarios
         validateReservationFields(dto, table, null, true);
 
         // Crear reserva
@@ -147,7 +144,6 @@ public class ReservationService {
         reservation.updateFromDto(dto, customer, table);
         Reservation saved = reservationRepository.save(reservation);
 
-        // Enviar notificación opcional
         if (sendEmail) {
             publishReservationNotification(saved, "creada");
         }
@@ -174,10 +170,8 @@ public class ReservationService {
         Customer customer = findCustomerById(customerId);
         ZonedDateTime now = ZonedDateTime.now(RESTAURANT_ZONE).truncatedTo(ChronoUnit.MINUTES);
 
-        // Buscar la mejor mesa disponible según capacidad y horario
         TableEntity table = findBestTableForWalkIn(numberOfPeople, now.toLocalDate());
 
-        // Preparar DTO para validación
         ReservationRequest dto = new ReservationRequest();
         dto.setCustomerId(customerId);
         dto.setTableId(table.getId());
@@ -186,10 +180,8 @@ public class ReservationService {
         dto.setReservationTime(now.toLocalTime());
         dto.setStatus(ReservationStatus.CONFIRMED);
 
-        // Validación de reservas
         validateReservationFields(dto, table, null, true); // true = walk-in
 
-        // Crear reserva
         Reservation reservation = Reservation.builder()
                 .customer(customer)
                 .table(table)
@@ -198,12 +190,10 @@ public class ReservationService {
         reservation.updateFromDto(dto, customer, table);
         Reservation saved = reservationRepository.save(reservation);
 
-        // Enviar correo opcional
         if (sendEmail) {
             publishReservationNotification(saved, "creada");
         }
 
-        // Marcar mesa ocupada
         table.setStatus(TableStatus.OCCUPIED);
         tableRepository.save(table);
 
@@ -575,8 +565,8 @@ public class ReservationService {
 
     private void publishReservationNotification(Reservation reservation, String action) {
         try {
-            String tableAlias = reservation.getTable().getAlias(); // amigable para el usuario
-            String tableCode = reservation.getTable().getCode(); // identificador técnico
+            String tableAlias = reservation.getTable().getAlias();
+            String tableCode = reservation.getTable().getCode();
 
             ReservationNotificationEvent event = ReservationNotificationEvent.builder()
                     .userId(reservation.getCustomer().getId())

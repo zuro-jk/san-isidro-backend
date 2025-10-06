@@ -71,7 +71,6 @@ public class UserService {
             throw new AccessDeniedException("Acceso denegado: solo administradores");
         }
 
-        // Excluir usuarios con roles que no pertenecen al personal interno
         Set<String> excludedRoles = Set.of("ROLE_CLIENT", "ROLE_SUPPLIER");
 
         List<User> users = userRepository.findAll().stream()

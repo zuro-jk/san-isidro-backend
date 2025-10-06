@@ -27,13 +27,12 @@ public class NotificationController {
     ) {
         String senderName;
         String senderEmail;
-        String senderPhone = contact.getPhone(); // NUEVO: phone opcional
+        String senderPhone = contact.getPhone();
 
-        // Determinar datos del remitente
         if (user != null) {
             senderName = user.getFullName();
             senderEmail = user.getEmail();
-            senderPhone = user.getPhone(); // opcional si tu User tiene phone
+            senderPhone = user.getPhone();
         } else {
             if (contact.getName() == null || contact.getEmail() == null) {
                 return ResponseEntity.badRequest().body(
