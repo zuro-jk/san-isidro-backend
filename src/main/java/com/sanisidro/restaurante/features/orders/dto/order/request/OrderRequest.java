@@ -14,12 +14,11 @@ import java.util.List;
 @Data
 public class OrderRequest {
 
-//    @NotNull(message = "El cliente es obligatorio")
     private Long customerId;
-
     private Long employeeId;
 
-    private Long addressId;
+    @Valid
+    private DeliveryAddressRequest deliveryAddress;
 
     @NotNull(message = "El estado de la orden es obligatorio")
     private Long statusId;
