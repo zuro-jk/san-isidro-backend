@@ -99,7 +99,6 @@ public class TableService {
             end = end.plusMinutes(after);
         }
 
-        // Verificar si la mesa está abierta en ese horario
         LocalTime reservationStartTime = start.toLocalTime();
         LocalTime reservationEndTime = end.toLocalTime();
         if (reservationStartTime.isBefore(table.getOpenTime()) || reservationEndTime.isAfter(table.getCloseTime())) {

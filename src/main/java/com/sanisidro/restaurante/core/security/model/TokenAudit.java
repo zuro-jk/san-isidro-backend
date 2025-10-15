@@ -22,7 +22,7 @@ public class TokenAudit {
 
     private String username;
 
-    private String reason; // logout, refresh, logout_all, etc.
+    private String reason;
 
     private Instant blacklistedAt;
 

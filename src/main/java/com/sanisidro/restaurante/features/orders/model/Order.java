@@ -33,9 +33,27 @@ public class Order {
     @JoinColumn(name = "employee_id")
     private Employee employee;
 
-    @ManyToOne
-    @JoinColumn(name = "address_id")
-    private Address address;
+    // @ManyToOne
+    // @JoinColumn(name = "address_id")
+    // private Address address;
+
+    @Column(name = "delivery_street")
+    private String deliveryStreet;
+
+    @Column(name = "delivery_reference")
+    private String deliveryReference;
+
+    @Column(name = "delivery_city")
+    private String deliveryCity;
+
+    @Column(name = "delivery_instructions")
+    private String deliveryInstructions;
+
+    @Column(name = "delivery_latitude")
+    private Double deliveryLatitude;
+
+    @Column(name = "delivery_longitude")
+    private Double deliveryLongitude;
 
     @Column(name = "date", nullable = false)
     private LocalDateTime date;

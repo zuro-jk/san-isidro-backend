@@ -21,12 +21,10 @@ public class TableController {
 
     private final TableService tableService;
 
-    /* -------------------- DISPONIBILIDAD / HORARIOS -------------------- */
-
     @GetMapping("/available-times")
     public ResponseEntity<ApiResponse<List<TableAvailabilityResponse>>> getAvailableTablesWithTimes(
             @RequestParam int numberOfPeople,
-            @RequestParam String date, // formato "yyyy-MM-dd"
+            @RequestParam String date,
             @RequestParam(required = false, defaultValue = "true") boolean filterByCapacity
     ) {
         LocalDateTime dateTime = LocalDate.parse(date).atStartOfDay();

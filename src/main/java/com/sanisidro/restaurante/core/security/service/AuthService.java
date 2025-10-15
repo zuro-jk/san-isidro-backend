@@ -33,6 +33,7 @@ import com.sanisidro.restaurante.core.security.dto.LoginRequest;
 import com.sanisidro.restaurante.core.security.dto.RegisterRequest;
 import com.sanisidro.restaurante.core.security.dto.UserProfileResponse;
 import com.sanisidro.restaurante.core.security.dto.UserSessionResponse;
+import com.sanisidro.restaurante.core.security.enums.AuthProvider;
 import com.sanisidro.restaurante.core.security.jwt.JwtService;
 import com.sanisidro.restaurante.core.security.model.RefreshToken;
 import com.sanisidro.restaurante.core.security.model.Role;
@@ -40,6 +41,8 @@ import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.RefreshTokenRepository;
 import com.sanisidro.restaurante.core.security.repository.RoleRepository;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
+import com.sanisidro.restaurante.features.customers.dto.customer.request.CustomerRequest;
+import com.sanisidro.restaurante.features.customers.service.CustomerService;
 import com.sanisidro.restaurante.features.notifications.dto.EmailVerificationEvent;
 import com.sanisidro.restaurante.features.notifications.kafka.NotificationProducer;
 
@@ -64,6 +67,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final TokenBlacklistService tokenBlacklistService;
     private final FileService fileService;
+    private final CustomerService customerService;
 
     private final NotificationProducer notificationProducer;
 
@@ -145,9 +149,17 @@ public class AuthService {
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .verificationCode(UUID.randomUUID().toString())
+                .provider(AuthProvider.LOCAL)
                 .build();
 
         userRepository.save(user);
+
+        CustomerRequest dto = CustomerRequest.builder()
+                .userId(user.getId())
+                .points(10)
+                .build();
+
+        customerService.createCustomer(dto);
 
         EmailVerificationEvent event = EmailVerificationEvent.builder()
                 .userId(user.getId())
@@ -296,7 +308,7 @@ public class AuthService {
             try {
                 profileImageUrl = fileService.getFileUrl(user.getProfileImageId());
             } catch (Exception e) {
-                profileImageUrl = null; // Si falla, dejamos null
+                profileImageUrl = null;
             }
         }
 

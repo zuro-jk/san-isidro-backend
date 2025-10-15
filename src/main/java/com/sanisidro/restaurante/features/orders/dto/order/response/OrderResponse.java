@@ -16,8 +16,14 @@ public class OrderResponse {
     private String customerName;
     private Long employeeId;
     private String employeeName;
-    private Long addressId;
-    private String addressDescription;
+
+    private String deliveryStreet;
+    private String deliveryReference;
+    private String deliveryCity;
+    private String deliveryInstructions;
+    private Double deliveryLatitude;
+    private Double deliveryLongitude;
+
     private LocalDateTime date;
     private Long statusId;
     private String statusName;

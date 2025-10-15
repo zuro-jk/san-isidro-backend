@@ -44,9 +44,8 @@ class FileServiceTest {
                     fis
             );
 
-            // Crear archivo temporal
             File tempFile = File.createTempFile("test-video-", ".mp4");
-            tempFile.deleteOnExit(); // para borrar al terminar
+            tempFile.deleteOnExit();
             try (FileOutputStream fos = new FileOutputStream(tempFile)) {
                 fos.write(mockFile.getBytes());
             }

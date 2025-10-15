@@ -22,7 +22,6 @@ public class NotificationHandlerConfig {
             EmailNotificationService emailService) {
         Map<String, Map<String, NotificationHandler<? extends NotifiableEvent>>> handlers = new HashMap<>();
 
-        // Canal EMAIL
         Map<String, NotificationHandler<? extends NotifiableEvent>> emailHandlers = new HashMap<>();
         emailHandlers.put(EmailVerificationEvent.class.getSimpleName(), emailService);
         emailHandlers.put(OrderNotificationEvent.class.getSimpleName(), emailService);

@@ -32,7 +32,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(OAuth2AuthenticationException.class)
     public ResponseEntity<ApiResponse<Object>> handleOAuth2Exception(OAuth2AuthenticationException ex) {
-        ex.printStackTrace(); // log completo en consola
+        ex.printStackTrace(); 
         OAuth2Error error = ex.getError();
         String errorDescription = error.getDescription() != null ? error.getDescription() : error.getErrorCode();
         String message = "OAuth2 Authentication failed: " + errorDescription;
@@ -59,6 +59,7 @@ public class GlobalExceptionHandler {
             CategoryNotFoundException.class,
             InventoryNotFoundException.class,
             SupplierNotFoundException.class,
+            IngredientNotFoundException.class,
             EntityNotFoundException.class,
     })
     public ResponseEntity<ApiResponse<Object>> handleNotFound(RuntimeException ex) {

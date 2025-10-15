@@ -1,17 +1,29 @@
 package com.sanisidro.restaurante.features.products.controller;
 
-import com.sanisidro.restaurante.core.security.dto.ApiResponse;
-import com.sanisidro.restaurante.features.products.dto.inventory.request.InventoryCreateRequest;
-import com.sanisidro.restaurante.features.products.dto.inventory.request.InventoryUpdateRequest;
-import com.sanisidro.restaurante.features.products.dto.inventory.response.InventoryResponse;
-import com.sanisidro.restaurante.features.products.service.InventoryService;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
+import com.sanisidro.restaurante.core.security.dto.ApiResponse;
+import com.sanisidro.restaurante.features.products.dto.inventory.request.AddStockRequest;
+import com.sanisidro.restaurante.features.products.dto.inventory.request.InventoryCreateRequest;
+import com.sanisidro.restaurante.features.products.dto.inventory.request.InventoryUpdateRequest;
+import com.sanisidro.restaurante.features.products.dto.inventory.response.InventoryDetailResponse;
+import com.sanisidro.restaurante.features.products.dto.inventory.response.InventoryResponse;
+import com.sanisidro.restaurante.features.products.service.InventoryService;
+
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/v1/inventories")
@@ -27,15 +39,9 @@ public class InventoryController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<InventoryResponse>> getById(@PathVariable Long id) {
-        InventoryResponse inventory = inventoryService.getById(id);
-        return ResponseEntity.ok(new ApiResponse<>(true, "Inventario obtenido correctamente", inventory));
-    }
-
-    @GetMapping("/ingredient/{ingredientId}")
-    public ResponseEntity<ApiResponse<InventoryResponse>> getByIngredient(@PathVariable Long ingredientId) {
-        InventoryResponse inventory = inventoryService.getByIngredient(ingredientId);
-        return ResponseEntity.ok(new ApiResponse<>(true, "Inventario por ingrediente obtenido correctamente", inventory));
+    public ResponseEntity<ApiResponse<InventoryDetailResponse>> getById(@PathVariable Long id) {
+        InventoryDetailResponse inventoryDetail = inventoryService.getById(id);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Inventario obtenido correctamente", inventoryDetail));
     }
 
     @PostMapping
@@ -45,8 +51,17 @@ public class InventoryController {
                 .body(new ApiResponse<>(true, "Inventario creado correctamente", created));
     }
 
+    @PostMapping("/{id}/add-stock")
+    public ResponseEntity<ApiResponse<InventoryResponse>> addStock(
+            @PathVariable Long id,
+            @Valid @RequestBody AddStockRequest request) {
+        InventoryResponse updated = inventoryService.addStock(id, request);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Stock actualizado correctamente", updated));
+    }
+
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<InventoryResponse>> update(@PathVariable Long id, @Valid @RequestBody InventoryUpdateRequest request) {
+    public ResponseEntity<ApiResponse<InventoryResponse>> update(@PathVariable Long id,
+            @Valid @RequestBody InventoryUpdateRequest request) {
         InventoryResponse updated = inventoryService.update(id, request);
         return ResponseEntity.ok(new ApiResponse<>(true, "Inventario actualizado correctamente", updated));
     }
