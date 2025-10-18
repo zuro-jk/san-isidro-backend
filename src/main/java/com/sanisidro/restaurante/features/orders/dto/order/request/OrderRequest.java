@@ -1,15 +1,15 @@
 package com.sanisidro.restaurante.features.orders.dto.order.request;
 
+import java.util.List;
+
 import com.sanisidro.restaurante.features.orders.dto.document.request.DocumentInOrderRequest;
-import com.sanisidro.restaurante.features.orders.dto.document.request.DocumentRequest;
 import com.sanisidro.restaurante.features.orders.dto.orderdetail.request.OrderDetailInOrderRequest;
 import com.sanisidro.restaurante.features.orders.dto.payment.request.PaymentInOrderRequest;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-
-import java.util.List;
 
 @Data
 public class OrderRequest {
@@ -19,6 +19,9 @@ public class OrderRequest {
 
     @Valid
     private DeliveryAddressRequest deliveryAddress;
+
+    private Long tableId;
+    private Long pickupStoreId;
 
     @NotNull(message = "El estado de la orden es obligatorio")
     private Long statusId;
@@ -35,6 +38,5 @@ public class OrderRequest {
 
     @Valid
     private List<@Valid DocumentInOrderRequest> documents;
-
 
 }

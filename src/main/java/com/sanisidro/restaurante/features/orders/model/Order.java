@@ -1,15 +1,31 @@
 package com.sanisidro.restaurante.features.orders.model;
 
-import com.sanisidro.restaurante.features.customers.model.Address;
-import com.sanisidro.restaurante.features.customers.model.Customer;
-import com.sanisidro.restaurante.features.employees.model.Employee;
-import jakarta.persistence.*;
-import lombok.*;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.Set;
+
+import com.sanisidro.restaurante.features.customers.model.Customer;
+import com.sanisidro.restaurante.features.employees.model.Employee;
+import com.sanisidro.restaurante.features.restaurant.model.Store;
+import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "orders")
@@ -33,10 +49,6 @@ public class Order {
     @JoinColumn(name = "employee_id")
     private Employee employee;
 
-    // @ManyToOne
-    // @JoinColumn(name = "address_id")
-    // private Address address;
-
     @Column(name = "delivery_street")
     private String deliveryStreet;
 
@@ -49,14 +61,28 @@ public class Order {
     @Column(name = "delivery_instructions")
     private String deliveryInstructions;
 
+    @Column(name = "delivery_province")
+    private String deliveryProvince;
+
+    @Column(name = "delivery_zip_code")
+    private String deliveryZipCode;
+
     @Column(name = "delivery_latitude")
     private Double deliveryLatitude;
 
     @Column(name = "delivery_longitude")
     private Double deliveryLongitude;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pickup_store_id")
+    private Store pickupStore;
+
     @Column(name = "date", nullable = false)
     private LocalDateTime date;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "table_id")
+    private TableEntity table;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "order_status_id", nullable = false)

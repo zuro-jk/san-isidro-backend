@@ -21,8 +21,17 @@ public class OrderResponse {
     private String deliveryReference;
     private String deliveryCity;
     private String deliveryInstructions;
+    private String deliveryProvince;
+    private String deliveryZipCode;
     private Double deliveryLatitude;
     private Double deliveryLongitude;
+
+    private Long tableId;
+    private String tableCode;
+
+    private Long pickupStoreId;
+    private String pickupStoreName;
+    private String pickupStoreAddress;
 
     private LocalDateTime date;
     private Long statusId;

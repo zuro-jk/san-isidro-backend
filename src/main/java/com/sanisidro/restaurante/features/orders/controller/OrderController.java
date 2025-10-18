@@ -2,7 +2,6 @@ package com.sanisidro.restaurante.features.orders.controller;
 
 import java.util.List;
 
-import com.sanisidro.restaurante.core.security.model.User;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -16,11 +15,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
+import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.features.orders.dto.order.request.OrderRequest;
 import com.sanisidro.restaurante.features.orders.dto.order.response.OrderResponse;
 import com.sanisidro.restaurante.features.orders.dto.payment.request.PaymentInOrderRequest;
 import com.sanisidro.restaurante.features.orders.service.OrderService;
-import com.sanisidro.restaurante.features.orders.service.PaymentService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -50,10 +49,10 @@ public class OrderController {
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getMyOrders(
             @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang,
-            @AuthenticationPrincipal User user
-    ) {
+            @AuthenticationPrincipal User user) {
         List<OrderResponse> orders = orderService.getOrdersForCurrentUser(user, lang);
-        return ResponseEntity.ok(new ApiResponse<>(true, "Órdenes del usuario autenticado obtenidas correctamente", orders));
+        return ResponseEntity
+                .ok(new ApiResponse<>(true, "Órdenes del usuario autenticado obtenidas correctamente", orders));
     }
 
     @PostMapping

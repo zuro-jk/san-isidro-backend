@@ -10,6 +10,8 @@ public class DeliveryAddressRequest {
     private String reference;
     private String city;
     private String instructions;
+    private String province;
+    private String zipCode;
 
     @NotNull(message = "La latitud es obligatoria para el delivery")
     private Double latitude;
