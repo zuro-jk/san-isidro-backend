@@ -1,13 +1,13 @@
 package com.sanisidro.restaurante.features.orders.dto.payment.request;
 
+import java.math.BigDecimal;
+
 import com.sanisidro.restaurante.features.orders.enums.PaymentStatus;
+
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 @Data
 public class PaymentInOrderRequest {

@@ -48,6 +48,11 @@ import com.sanisidro.restaurante.features.products.model.Product;
 import com.sanisidro.restaurante.features.products.repository.InventoryMovementRepository;
 import com.sanisidro.restaurante.features.products.repository.InventoryRepository;
 import com.sanisidro.restaurante.features.products.repository.ProductRepository;
+import com.sanisidro.restaurante.features.restaurant.enums.TableStatus;
+import com.sanisidro.restaurante.features.restaurant.model.Store;
+import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
+import com.sanisidro.restaurante.features.restaurant.repository.StoreRepository;
+import com.sanisidro.restaurante.features.restaurant.repository.TableRepository;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -69,10 +74,10 @@ public class OrderService {
         private final InventoryMovementRepository inventoryMovementRepository;
         private final DocumentService documentService;
         private final PaymentService paymentService;
-
         private final NotificationProducer notificationProducer;
-
         private final UserRepository userRepository;
+        private final TableRepository tableRepository;
+        private final StoreRepository storeRepository;
 
         public List<OrderResponse> getAll(String lang) {
                 return orderRepository.findAll().stream()
@@ -187,6 +192,8 @@ public class OrderService {
                         order.setDeliveryReference(addrDto.getReference());
                         order.setDeliveryCity(addrDto.getCity());
                         order.setDeliveryInstructions(addrDto.getInstructions());
+                        order.setDeliveryProvince(addrDto.getProvince());
+                        order.setDeliveryZipCode(addrDto.getZipCode());
                         order.setDeliveryLatitude(addrDto.getLatitude());
                         order.setDeliveryLongitude(addrDto.getLongitude());
                 }
@@ -279,18 +286,63 @@ public class OrderService {
                                 .payments(new LinkedHashSet<>())
                                 .documents(new LinkedHashSet<>());
 
-                if (request.getDeliveryAddress() != null) {
-                        DeliveryAddressRequest addrDto = request.getDeliveryAddress();
-                        orderBuilder.deliveryStreet(addrDto.getStreet())
-                                        .deliveryReference(addrDto.getReference())
-                                        .deliveryCity(addrDto.getCity())
-                                        .deliveryInstructions(addrDto.getInstructions())
-                                        .deliveryLatitude(addrDto.getLatitude())
-                                        .deliveryLongitude(addrDto.getLongitude());
+                String orderTypeCode = type.getCode() != null ? type.getCode().toUpperCase() : "";
+
+                switch (orderTypeCode) {
+                        case "DELIVERY":
+                                // Si es DELIVERY, tomamos los datos de la dirección
+                                if (request.getDeliveryAddress() == null) {
+                                        throw new IllegalArgumentException(
+                                                        "La dirección de entrega es obligatoria para órdenes a domicilio.");
+                                }
+                                DeliveryAddressRequest addrDto = request.getDeliveryAddress();
+                                orderBuilder.deliveryStreet(addrDto.getStreet())
+                                                .deliveryReference(addrDto.getReference())
+                                                .deliveryCity(addrDto.getCity())
+                                                .deliveryInstructions(addrDto.getInstructions())
+                                                .deliveryProvince(addrDto.getProvince())
+                                                .deliveryZipCode(addrDto.getZipCode())
+                                                .deliveryLatitude(addrDto.getLatitude())
+                                                .deliveryLongitude(addrDto.getLongitude());
+                                break;
+
+                        case "DINE_IN":
+                                if (request.getTableId() == null) {
+                                        throw new IllegalArgumentException(
+                                                        "La mesa es obligatoria para órdenes presenciales.");
+                                }
+                                TableEntity selectedTable = tableRepository.findById(request.getTableId())
+                                                .orElseThrow(() -> new EntityNotFoundException(
+                                                                "Mesa no encontrada con id: " + request.getTableId()));
+
+                                if (selectedTable.getStatus() != TableStatus.FREE) {
+                                        throw new IllegalStateException(
+                                                        "La mesa " + selectedTable.getCode() + " no está disponible.");
+                                }
+
+                                orderBuilder.table(selectedTable);
+                                break;
+
+                        case "TAKE_AWAY":
+                                if (request.getPickupStoreId() == null) {
+                                        throw new IllegalArgumentException(
+                                                        "La tienda de recogida es obligatoria para órdenes para llevar.");
+                                }
+
+                                Store pickupStore = storeRepository.findById(request.getPickupStoreId())
+                                                .orElseThrow(() -> new EntityNotFoundException(
+                                                                "Tienda no encontrada con id: "
+                                                                                + request.getPickupStoreId()));
+
+                                orderBuilder.pickupStore(pickupStore);
+                                break;
+
+                        default:
+                                log.warn("Tipo de orden no reconocido para lógica especial: {}", orderTypeCode);
+                                break;
                 }
 
                 return orderBuilder.build();
-
         }
 
         private void savePaymentsAndDocuments(Order order, OrderRequest request) {
@@ -365,12 +417,35 @@ public class OrderService {
                                                                 .build())
                                                 .toList());
 
-                responseBuilder.deliveryStreet(order.getDeliveryStreet())
-                                .deliveryReference(order.getDeliveryReference())
-                                .deliveryCity(order.getDeliveryCity())
-                                .deliveryInstructions(order.getDeliveryInstructions())
-                                .deliveryLatitude(order.getDeliveryLatitude())
-                                .deliveryLongitude(order.getDeliveryLongitude());
+                String orderTypeCode = order.getType().getCode() != null ? order.getType().getCode().toUpperCase() : "";
+
+                switch (orderTypeCode) {
+                        case "DELIVERY":
+                                responseBuilder.deliveryStreet(order.getDeliveryStreet())
+                                                .deliveryReference(order.getDeliveryReference())
+                                                .deliveryCity(order.getDeliveryCity())
+                                                .deliveryInstructions(order.getDeliveryInstructions())
+                                                .deliveryProvince(order.getDeliveryProvince())
+                                                .deliveryZipCode(order.getDeliveryZipCode())
+                                                .deliveryLatitude(order.getDeliveryLatitude())
+                                                .deliveryLongitude(order.getDeliveryLongitude());
+                                break;
+
+                        case "DINE_IN":
+                                if (order.getTable() != null) {
+                                        responseBuilder.tableId(order.getTable().getId())
+                                                        .tableCode(order.getTable().getCode());
+                                }
+                                break;
+                        case "TAKE_AWAY":
+                                if (order.getPickupStore() != null) {
+                                        responseBuilder
+                                                        .pickupStoreId(order.getPickupStore().getId())
+                                                        .pickupStoreName(order.getPickupStore().getName())
+                                                        .pickupStoreAddress(order.getPickupStore().getAddress());
+                                }
+                                break;
+                }
 
                 return responseBuilder.build();
         }

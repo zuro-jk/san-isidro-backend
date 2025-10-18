@@ -1,13 +1,8 @@
 package com.sanisidro.restaurante.core.exceptions;
 
-import com.sanisidro.restaurante.core.aws.exception.AccessDeniedException;
-import com.sanisidro.restaurante.core.aws.exception.FileNotFoundException;
-import com.sanisidro.restaurante.core.aws.exception.FileUploadException;
-import com.sanisidro.restaurante.core.security.dto.ApiResponse;
-import com.sanisidro.restaurante.features.products.exceptions.*;
-import com.sanisidro.restaurante.features.suppliers.exceptions.SupplierNotFoundException;
-import jakarta.persistence.EntityNotFoundException;
-import jakarta.persistence.OptimisticLockException;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,8 +14,23 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.HashMap;
-import java.util.Map;
+import com.sanisidro.restaurante.core.aws.exception.AccessDeniedException;
+import com.sanisidro.restaurante.core.aws.exception.FileNotFoundException;
+import com.sanisidro.restaurante.core.aws.exception.FileUploadException;
+import com.sanisidro.restaurante.core.security.dto.ApiResponse;
+import com.sanisidro.restaurante.features.products.exceptions.CategoryNotFoundException;
+import com.sanisidro.restaurante.features.products.exceptions.DuplicateProductException;
+import com.sanisidro.restaurante.features.products.exceptions.IngredientNotFoundException;
+import com.sanisidro.restaurante.features.products.exceptions.InsufficientStockException;
+import com.sanisidro.restaurante.features.products.exceptions.InvalidMovementTypeException;
+import com.sanisidro.restaurante.features.products.exceptions.InvalidQuantityException;
+import com.sanisidro.restaurante.features.products.exceptions.InventoryAlreadyExistsException;
+import com.sanisidro.restaurante.features.products.exceptions.InventoryNotFoundException;
+import com.sanisidro.restaurante.features.products.exceptions.ProductNotFoundException;
+import com.sanisidro.restaurante.features.suppliers.exceptions.SupplierNotFoundException;
+
+import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.OptimisticLockException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -32,7 +42,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(OAuth2AuthenticationException.class)
     public ResponseEntity<ApiResponse<Object>> handleOAuth2Exception(OAuth2AuthenticationException ex) {
-        ex.printStackTrace(); 
+        ex.printStackTrace();
         OAuth2Error error = ex.getError();
         String errorDescription = error.getDescription() != null ? error.getDescription() : error.getErrorCode();
         String message = "OAuth2 Authentication failed: " + errorDescription;
@@ -61,6 +71,7 @@ public class GlobalExceptionHandler {
             SupplierNotFoundException.class,
             IngredientNotFoundException.class,
             EntityNotFoundException.class,
+            ResourceNotFoundException.class
     })
     public ResponseEntity<ApiResponse<Object>> handleNotFound(RuntimeException ex) {
         return buildResponse(ex.getMessage(), HttpStatus.NOT_FOUND);
@@ -151,8 +162,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleOptimisticLock(RuntimeException ex) {
         return buildResponse(
                 "Conflicto de concurrencia: otro proceso modificó el recurso. Intente nuevamente.",
-                HttpStatus.CONFLICT
-        );
+                HttpStatus.CONFLICT);
     }
 
     @ExceptionHandler(InvalidPasswordException.class)

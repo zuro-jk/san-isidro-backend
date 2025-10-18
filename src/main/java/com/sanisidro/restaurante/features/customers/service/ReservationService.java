@@ -507,7 +507,7 @@ public class ReservationService {
                     dto.getNumberOfPeople(),
                     dto.getReservationDate(),
                     dto.getReservationTime());
-            dto.setTableId(table.getId());
+            dto.setTableId(table.getId());  
         } else {
             table = findTableById(dto.getTableId());
         }
