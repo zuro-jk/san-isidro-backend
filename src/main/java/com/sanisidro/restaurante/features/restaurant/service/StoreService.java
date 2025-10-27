@@ -105,6 +105,8 @@ public class StoreService {
                 .phone(store.getPhone())
                 .openTime(store.getOpenTime())
                 .closeTime(store.getCloseTime())
+                .latitude(store.getLatitude())
+                .longitude(store.getLongitude())
                 .build();
     }
 

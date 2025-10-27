@@ -1,5 +1,7 @@
 package com.sanisidro.restaurante.features.employees.service;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -8,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.sanisidro.restaurante.features.employees.dto.schedule.request.ScheduleRequest;
 import com.sanisidro.restaurante.features.employees.dto.schedule.response.ScheduleResponse;
+import com.sanisidro.restaurante.features.employees.enums.DayOfWeekEnum;
 import com.sanisidro.restaurante.features.employees.model.Employee;
 import com.sanisidro.restaurante.features.employees.model.Schedule;
 import com.sanisidro.restaurante.features.employees.repository.EmployeeRepository;
@@ -76,6 +79,16 @@ public class ScheduleService {
         Schedule schedule = scheduleRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Horario no encontrado con id: " + id));
         scheduleRepository.delete(schedule);
+    }
+
+     public boolean isWithinSchedule(Employee employee) {
+        var today = LocalDate.now();
+        var now = LocalTime.now();
+        var dayOfWeek = DayOfWeekEnum.valueOf(today.getDayOfWeek().name());
+
+        return employee.getSchedules().stream()
+                .filter(s -> s.getDayOfWeek() == dayOfWeek)
+                .anyMatch(s -> now.isAfter(s.getStartTime()) && now.isBefore(s.getEndTime()));
     }
 
     private ScheduleResponse mapToResponse(Schedule schedule) {

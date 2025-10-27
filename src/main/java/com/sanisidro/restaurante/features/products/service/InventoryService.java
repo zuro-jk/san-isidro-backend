@@ -173,6 +173,13 @@ public class InventoryService {
         }
     }
 
+    public List<InventoryResponse> findLowStockInventories() {
+        return inventoryRepository.findLowStockInventories()
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
     private InventoryResponse mapToResponse(Inventory inventory) {
         Ingredient ingredient = inventory.getIngredient();
 

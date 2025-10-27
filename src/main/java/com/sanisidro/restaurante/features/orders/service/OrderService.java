@@ -1,14 +1,15 @@
 package com.sanisidro.restaurante.features.orders.service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.springframework.scheduling.annotation.Async;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,12 +43,15 @@ import com.sanisidro.restaurante.features.orders.repository.OrderTypeRepository;
 import com.sanisidro.restaurante.features.products.enums.MovementSource;
 import com.sanisidro.restaurante.features.products.enums.MovementType;
 import com.sanisidro.restaurante.features.products.exceptions.InventoryNotFoundException;
+import com.sanisidro.restaurante.features.products.model.Ingredient;
 import com.sanisidro.restaurante.features.products.model.Inventory;
 import com.sanisidro.restaurante.features.products.model.InventoryMovement;
 import com.sanisidro.restaurante.features.products.model.Product;
+import com.sanisidro.restaurante.features.products.model.ProductIngredient;
 import com.sanisidro.restaurante.features.products.repository.InventoryMovementRepository;
 import com.sanisidro.restaurante.features.products.repository.InventoryRepository;
 import com.sanisidro.restaurante.features.products.repository.ProductRepository;
+import com.sanisidro.restaurante.features.reports.dto.response.OrderTypeReportResponse;
 import com.sanisidro.restaurante.features.restaurant.enums.TableStatus;
 import com.sanisidro.restaurante.features.restaurant.model.Store;
 import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
@@ -78,6 +82,7 @@ public class OrderService {
         private final UserRepository userRepository;
         private final TableRepository tableRepository;
         private final StoreRepository storeRepository;
+        private final DistanceMatrixService distanceMatrixService;
 
         public List<OrderResponse> getAll(String lang) {
                 return orderRepository.findAll().stream()
@@ -88,6 +93,54 @@ public class OrderService {
         public OrderResponse getById(Long id, String lang) {
                 Order order = orderRepository.findById(id)
                                 .orElseThrow(() -> new EntityNotFoundException("Orden no encontrada con id: " + id));
+                return mapToResponse(order, lang);
+        }
+
+        public OrderResponse getTrackingInfo(Long id, String lang) {
+                Order order = orderRepository.findById(id)
+                                .orElseThrow(() -> new EntityNotFoundException("Orden no encontrada con id: " + id));
+
+                if (order.getType() != null &&
+                                "DELIVERY".equalsIgnoreCase(order.getType().getCode()) &&
+                                order.getDeliveryLatitude() != null && order.getDeliveryLongitude() != null) {
+
+                        try {
+                                Store mainStore = storeRepository.findAll().stream()
+                                                .findFirst()
+                                                .orElseThrow(() -> new IllegalStateException(
+                                                                "No hay tiendas configuradas."));
+
+                                double originLat = mainStore.getLatitude();
+                                double originLng = mainStore.getLongitude();
+                                double destLat = order.getDeliveryLatitude();
+                                double destLng = order.getDeliveryLongitude();
+
+                                // Consultar servicio DistanceMatrix (por ejemplo, Google API)
+                                Map<String, Object> distanceResponse = distanceMatrixService
+                                                .getDistanceAndDuration(originLat, originLng, destLat, destLng);
+
+                                var rows = (List<?>) distanceResponse.get("rows");
+                                if (rows != null && !rows.isEmpty()) {
+                                        var elements = (List<?>) ((Map<?, ?>) rows.get(0)).get("elements");
+                                        if (elements != null && !elements.isEmpty()) {
+                                                Map<?, ?> element = (Map<?, ?>) elements.get(0);
+                                                Map<?, ?> distance = (Map<?, ?>) element.get("distance");
+                                                Map<?, ?> duration = (Map<?, ?>) element.get("duration");
+
+                                                if (distance != null && duration != null) {
+                                                        order.setEstimatedDistance(distance.get("text").toString());
+                                                        order.setEstimatedDuration(duration.get("text").toString());
+                                                }
+                                        }
+                                }
+                        } catch (Exception e) {
+                                log.error("Error recalculando distancia o duración estimada para tracking: {}",
+                                                e.getMessage());
+                        }
+                }
+
+                orderRepository.save(order);
+
                 return mapToResponse(order, lang);
         }
 
@@ -102,11 +155,8 @@ public class OrderService {
         }
 
         @Transactional
-        public OrderResponse create(OrderRequest request, String lang) {
-                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-                User currentUser = (User) authentication.getPrincipal();
-
-                Customer customer = customerRepository.findByUserId(currentUser.getId())
+        public OrderResponse create(User user, OrderRequest request, String lang) {
+                Customer customer = customerRepository.findByUserId(user.getId())
                                 .orElseThrow(() -> new EntityNotFoundException(
                                                 "Cliente no encontrado para el usuario autenticado"));
 
@@ -132,20 +182,15 @@ public class OrderService {
                         }
 
                         BigDecimal priceWithTax = basePrice.multiply(BigDecimal.ONE.add(taxRate));
-
                         BigDecimal safeQuantity = d.getQuantity() != null ? BigDecimal.valueOf(d.getQuantity())
                                         : BigDecimal.ZERO;
+
                         if (safeQuantity.compareTo(BigDecimal.ZERO) <= 0) {
                                 throw new IllegalArgumentException(
                                                 "Cantidad inválida para el producto con id " + d.getProductId());
                         }
 
                         BigDecimal lineTotal = priceWithTax.multiply(safeQuantity);
-                        if (lineTotal == null) {
-                                throw new IllegalStateException(
-                                                "Error al calcular el total de la línea del producto con id "
-                                                                + product.getId());
-                        }
 
                         log.debug("Calculando línea -> productoId={}, priceWithTax={}, quantity={}, lineTotal={}",
                                         product.getId(), priceWithTax, safeQuantity, lineTotal);
@@ -165,6 +210,81 @@ public class OrderService {
 
                 order.setDetails(details);
                 order.setTotal(total);
+
+                if (order.getType() != null &&
+                                "DELIVERY".equalsIgnoreCase(order.getType().getCode()) &&
+                                order.getDeliveryLatitude() != null &&
+                                order.getDeliveryLongitude() != null) {
+
+                        try {
+                                Store mainStore = storeRepository.findAll().stream()
+                                                .findFirst()
+                                                .orElseThrow(() -> new IllegalStateException(
+                                                                "No hay tiendas configuradas."));
+
+                                double originLat = mainStore.getLatitude();
+                                double originLng = mainStore.getLongitude();
+                                double destLat = order.getDeliveryLatitude();
+                                double destLng = order.getDeliveryLongitude();
+
+                                Map<String, Object> distanceResponse = distanceMatrixService.getDistanceAndDuration(
+                                                originLat, originLng, destLat, destLng);
+
+                                var rows = (List<?>) distanceResponse.get("rows");
+                                if (rows != null && !rows.isEmpty()) {
+                                        var elements = (List<?>) ((Map<?, ?>) rows.get(0)).get("elements");
+                                        if (elements != null && !elements.isEmpty()) {
+                                                Map<?, ?> element = (Map<?, ?>) elements.get(0);
+                                                Map<?, ?> distance = (Map<?, ?>) element.get("distance");
+                                                Map<?, ?> duration = (Map<?, ?>) element.get("duration");
+
+                                                if (distance != null && duration != null) {
+                                                        String distanceText = distance.get("text").toString();
+                                                        String durationText = duration.get("text").toString();
+
+                                                        log.info("Distancia calculada: {}, Duración estimada: {}",
+                                                                        distanceText, durationText);
+
+                                                        order.setEstimatedDistance(distanceText);
+                                                        order.setEstimatedDuration(durationText);
+
+                                                        int estimatedTimeMinutes = parseDurationToMinutes(durationText);
+
+                                                        int totalPrepTime = request.getDetails().stream()
+                                                                        .mapToInt(d -> {
+                                                                                Product p = productRepository.findById(
+                                                                                                d.getProductId())
+                                                                                                .orElse(null);
+                                                                                return p != null && p
+                                                                                                .getPreparationTimeMinutes() != null
+                                                                                                                ? p.getPreparationTimeMinutes()
+                                                                                                                : 0;
+                                                                        })
+                                                                        .sum();
+
+                                                        int totalItems = request.getDetails().stream()
+                                                                        .mapToInt(d -> d.getQuantity() != null
+                                                                                        ? d.getQuantity()
+                                                                                        : 0)
+                                                                        .sum();
+
+                                                        int baseDelay = 10;
+                                                        int itemDelay = totalItems * 2;
+                                                        int trafficDelay = Math.max(5,
+                                                                        (int) Math.round(estimatedTimeMinutes * 0.3));
+
+                                                        int estimatedTotalTime = totalPrepTime + estimatedTimeMinutes
+                                                                        + baseDelay + itemDelay + trafficDelay;
+
+                                                        order.setEstimatedTime(estimatedTotalTime);
+                                                }
+                                        }
+                                }
+                        } catch (Exception e) {
+                                log.error("Error al calcular distancia o duración estimada: {}", e.getMessage());
+                                order.setEstimatedTime(30);
+                        }
+                }
 
                 savePaymentsAndDocuments(order, request);
                 Order savedOrder = orderRepository.save(order);
@@ -251,6 +371,57 @@ public class OrderService {
                 orderRepository.delete(order);
         }
 
+        public OrderResponse cancelOrder(Long id, User user, String lang) {
+                Order order = orderRepository.findById(id)
+                                .orElseThrow(() -> new EntityNotFoundException("Orden no encontrada"));
+
+                if (order.getStatus().getCode().equalsIgnoreCase("CANCELLED")) {
+                        throw new IllegalStateException("La orden ya se encuentra cancelada.");
+                }
+
+                boolean isOwner = order.getCustomer() != null
+                                && order.getCustomer().getUser() != null
+                                && order.getCustomer().getUser().getId().equals(user.getId());
+
+                boolean isAdmin = user.getRoles().stream()
+                                .anyMatch(role -> role.getName().equalsIgnoreCase("ROLE_ADMIN"));
+
+                if (!isOwner && !isAdmin) {
+                        throw new SecurityException("El usuario no está autorizado para cancelar esta orden.");
+                }
+
+                OrderStatus cancelledStatus = statusRepository.findByCode("CANCELLED")
+                                .orElseThrow(() -> new EntityNotFoundException("Estado 'CANCELLED' no encontrado"));
+                order.setStatus(cancelledStatus);
+
+                if (order.getDetails() != null && !order.getDetails().isEmpty()) {
+                        for (OrderDetail detail : order.getDetails()) {
+                                Product product = detail.getProduct();
+                                if (product != null && product.getIngredients() != null) {
+                                        for (ProductIngredient productIngredient : product.getIngredients()) {
+                                                Ingredient ingredient = productIngredient.getIngredient();
+                                                BigDecimal ingredientQty = BigDecimal
+                                                                .valueOf(productIngredient.getQuantity())
+                                                                .multiply(BigDecimal.valueOf(detail.getQuantity()));
+                                                Inventory inventory = inventoryRepository.findByIngredient(ingredient)
+                                                                .orElse(null);
+                                                if (inventory != null) {
+                                                        inventory.increaseStock(ingredientQty);
+                                                        inventoryRepository.save(inventory);
+                                                }
+                                        }
+                                }
+                        }
+                }
+
+                orderRepository.save(order);
+
+                // TODO: Enviar notificación ?
+                // notificationProducer.sendOrderCancelledNotification(order);
+
+                return mapToResponse(order, lang);
+        }
+
         @Transactional
         public void addLocalPayment(Long orderId, PaymentInOrderRequest request) {
                 Order order = orderRepository.findById(orderId)
@@ -290,11 +461,11 @@ public class OrderService {
 
                 switch (orderTypeCode) {
                         case "DELIVERY":
-                                // Si es DELIVERY, tomamos los datos de la dirección
                                 if (request.getDeliveryAddress() == null) {
                                         throw new IllegalArgumentException(
                                                         "La dirección de entrega es obligatoria para órdenes a domicilio.");
                                 }
+
                                 DeliveryAddressRequest addrDto = request.getDeliveryAddress();
                                 orderBuilder.deliveryStreet(addrDto.getStreet())
                                                 .deliveryReference(addrDto.getReference())
@@ -304,6 +475,47 @@ public class OrderService {
                                                 .deliveryZipCode(addrDto.getZipCode())
                                                 .deliveryLatitude(addrDto.getLatitude())
                                                 .deliveryLongitude(addrDto.getLongitude());
+
+                                Store mainStore = storeRepository.findAll().stream()
+                                                .findFirst()
+                                                .orElseThrow(() -> new IllegalStateException(
+                                                                "No hay tiendas configuradas en el sistema."));
+
+                                double originLat = mainStore.getLatitude();
+                                double originLng = mainStore.getLongitude();
+                                double destLat = addrDto.getLatitude();
+                                double destLng = addrDto.getLongitude();
+
+                                try {
+                                        Map<String, Object> distanceResponse = distanceMatrixService
+                                                        .getDistanceAndDuration(originLat, originLng, destLat, destLng);
+
+                                        var rows = (List<?>) distanceResponse.get("rows");
+                                        if (rows != null && !rows.isEmpty()) {
+                                                var elements = (List<?>) ((Map<?, ?>) rows.get(0)).get("elements");
+                                                if (elements != null && !elements.isEmpty()) {
+                                                        Map<?, ?> element = (Map<?, ?>) elements.get(0);
+                                                        Map<?, ?> distance = (Map<?, ?>) element.get("distance");
+                                                        Map<?, ?> duration = (Map<?, ?>) element.get("duration");
+
+                                                        if (distance != null && duration != null) {
+                                                                log.info("Distancia: {}, Duración: {}",
+                                                                                distance.get("text"),
+                                                                                duration.get("text"));
+
+                                                                orderBuilder
+                                                                                .estimatedDistance(distance.get("text")
+                                                                                                .toString())
+                                                                                .estimatedDuration(duration.get("text")
+                                                                                                .toString());
+                                                        }
+                                                }
+                                        }
+                                } catch (Exception e) {
+                                        log.error("Error al obtener la distancia o duración estimada: {}",
+                                                        e.getMessage());
+                                }
+
                                 break;
 
                         case "DINE_IN":
@@ -415,13 +627,20 @@ public class OrderService {
                                                                 .quantity(d.getQuantity())
                                                                 .unitPrice(d.getUnitPrice())
                                                                 .build())
-                                                .toList());
+                                                .toList())
+                                .estimatedTime(order.getEstimatedTime())
+                                .estimatedDistance(order.getEstimatedDistance())
+                                .estimatedDuration(order.getEstimatedDuration())
+                                .currentLatitude(order.getCurrentLatitude())
+                                .currentLongitude(order.getCurrentLongitude());
+                ;
 
                 String orderTypeCode = order.getType().getCode() != null ? order.getType().getCode().toUpperCase() : "";
 
                 switch (orderTypeCode) {
                         case "DELIVERY":
-                                responseBuilder.deliveryStreet(order.getDeliveryStreet())
+                                responseBuilder
+                                                .deliveryStreet(order.getDeliveryStreet())
                                                 .deliveryReference(order.getDeliveryReference())
                                                 .deliveryCity(order.getDeliveryCity())
                                                 .deliveryInstructions(order.getDeliveryInstructions())
@@ -551,4 +770,100 @@ public class OrderService {
                                 .orElse("Sin nombre");
         }
 
+        private int parseDurationToMinutes(String durationText) {
+                if (durationText == null || durationText.isBlank())
+                        return 0;
+
+                durationText = durationText.toLowerCase();
+                int minutes = 0;
+
+                try {
+                        if (durationText.contains("hour")) {
+                                String[] parts = durationText.split("hour");
+                                int hours = Integer.parseInt(parts[0].trim());
+                                minutes += hours * 60;
+
+                                if (parts.length > 1 && parts[1].contains("min")) {
+                                        String mins = parts[1].replaceAll("[^0-9]", "");
+                                        if (!mins.isEmpty())
+                                                minutes += Integer.parseInt(mins);
+                                }
+                        } else if (durationText.contains("min")) {
+                                String mins = durationText.replaceAll("[^0-9]", "");
+                                if (!mins.isEmpty())
+                                        minutes = Integer.parseInt(mins);
+                        }
+                } catch (Exception e) {
+                        log.warn("No se pudo parsear duración estimada: {}", durationText);
+                }
+
+                return minutes;
+        }
+
+        public int countOrdersByDate(LocalDate date) {
+                LocalDateTime startOfDay = date.atStartOfDay();
+                LocalDateTime endOfDay = date.atTime(23, 59, 59);
+                return orderRepository.countOrdersByDate(startOfDay, endOfDay);
+        }
+
+        public BigDecimal calculateSalesByDate(LocalDate date) {
+                LocalDateTime startOfDay = date.atStartOfDay();
+                LocalDateTime endOfDay = date.atTime(23, 59, 59);
+                return orderRepository.calculateSalesByDate(startOfDay, endOfDay);
+        }
+
+        public Map<LocalDate, Integer> countOrdersLast7Days() {
+                Map<LocalDate, Integer> map = new LinkedHashMap<>();
+                for (int i = 6; i >= 0; i--) {
+                        LocalDate day = LocalDate.now().minusDays(i);
+                        LocalDateTime startOfDay = day.atStartOfDay();
+                        LocalDateTime endOfDay = day.atTime(23, 59, 59);
+                        int count = orderRepository.countOrdersByDate(startOfDay, endOfDay);
+                        map.put(day, count);
+                }
+                return map;
+        }
+
+        public Map<LocalDate, BigDecimal> calculateSalesLast7Days() {
+                Map<LocalDate, BigDecimal> map = new LinkedHashMap<>();
+                for (int i = 6; i >= 0; i--) {
+                        LocalDate day = LocalDate.now().minusDays(i);
+                        LocalDateTime startOfDay = day.atStartOfDay();
+                        LocalDateTime endOfDay = day.atTime(23, 59, 59);
+                        BigDecimal sales = orderRepository.calculateSalesByDate(startOfDay, endOfDay);
+                        map.put(day, sales != null ? sales : BigDecimal.ZERO);
+                }
+                return map;
+        }
+
+        public Long countAllOrders() {
+                return orderRepository.count();
+        }
+
+        public BigDecimal calculateTotalSales() {
+                List<String> validStatuses = List.of("COMPLETED", "DELIVERED", "PAID");
+                BigDecimal total = orderRepository.sumTotalByStatusCodes(validStatuses);
+                return total != null ? total : BigDecimal.ZERO;
+        }
+
+        public List<OrderTypeReportResponse> getOrderTypeStatistics(String lang) {
+                return orderRepository.findOrderTypeStatistics(lang)
+                                .stream()
+                                .map(rowObj -> {
+                                        Object[] row = (Object[]) rowObj;
+
+                                        String orderTypeName = row[0] != null ? row[0].toString() : "DESCONOCIDO";
+                                        Long totalOrders = ((Number) row[1]).longValue();
+                                        BigDecimal totalRevenue = row[2] instanceof BigDecimal
+                                                        ? (BigDecimal) row[2]
+                                                        : new BigDecimal(row[2].toString());
+
+                                        return OrderTypeReportResponse.builder()
+                                                        .orderTypeName(orderTypeName)
+                                                        .totalOrders(totalOrders.intValue())
+                                                        .totalRevenue(totalRevenue)
+                                                        .build();
+                                })
+                                .toList();
+        }
 }

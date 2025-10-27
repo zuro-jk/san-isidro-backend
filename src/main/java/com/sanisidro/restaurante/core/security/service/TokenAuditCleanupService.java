@@ -1,26 +1,32 @@
 package com.sanisidro.restaurante.core.security.service;
 
-import com.sanisidro.restaurante.core.security.repository.TokenAuditRepository;
-import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
+import java.time.Instant;
+
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
+import com.sanisidro.restaurante.core.security.repository.TokenAuditRepository;
+
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TokenAuditCleanupService {
 
     private final TokenAuditRepository tokenAuditRepository;
 
     /**
-     * Elimina los registros con más de 12 meses.
+     * 🧹 Elimina los registros de auditoría con más de 12 meses de antigüedad.
      */
     @Transactional
     public void cleanupOldAudits() {
-        Instant cutoff = Instant.now().minusSeconds(12 * 30 * 24 * 60 * 60); // ~12 meses
-        tokenAuditRepository.deleteByBlacklistedAtBefore(cutoff);
-        System.out.println("TokenAudit cleanup executed at " + Instant.now());
+        // 12 meses ≈ 12 * 30 días
+        Instant cutoff = Instant.now().minusSeconds(12L * 30 * 24 * 60 * 60);
+        tokenAuditRepository.deleteByTimestampBefore(cutoff);
+
+        System.out.println("✅ TokenAudit cleanup ejecutado en: " + Instant.now());
     }
 
 }

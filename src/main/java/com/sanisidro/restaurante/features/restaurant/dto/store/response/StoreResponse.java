@@ -16,4 +16,7 @@ public class StoreResponse {
     private LocalTime openTime;
     private LocalTime closeTime;
 
+    private Double latitude;
+    private Double longitude;
+
 }

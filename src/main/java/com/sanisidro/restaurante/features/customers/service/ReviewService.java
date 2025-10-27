@@ -1,5 +1,11 @@
 package com.sanisidro.restaurante.features.customers.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+
 import com.sanisidro.restaurante.core.exceptions.ResourceNotFoundException;
 import com.sanisidro.restaurante.features.customers.dto.review.request.ReviewRequest;
 import com.sanisidro.restaurante.features.customers.dto.review.response.ReviewResponse;
@@ -13,13 +19,9 @@ import com.sanisidro.restaurante.features.orders.model.Order;
 import com.sanisidro.restaurante.features.orders.repository.OrderRepository;
 import com.sanisidro.restaurante.features.products.model.Product;
 import com.sanisidro.restaurante.features.products.repository.ProductRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -31,7 +33,6 @@ public class ReviewService {
     private final OrderRepository orderRepository;
     private final ReservationRepository reservationRepository;
     private final ProductRepository productRepository;
-
 
     public ReviewResponse getReview(Long id) {
         Review review = reviewRepository.findById(id)
@@ -58,9 +59,12 @@ public class ReviewService {
                 .build();
 
         int count = 0;
-        if (dto.getOrderId() != null) count++;
-        if (dto.getReservationId() != null) count++;
-        if (dto.getProductId() != null) count++;
+        if (dto.getOrderId() != null)
+            count++;
+        if (dto.getReservationId() != null)
+            count++;
+        if (dto.getProductId() != null)
+            count++;
         if (count != 1) {
             throw new IllegalArgumentException("Debe especificar exactamente uno: orderId, reservationId o productId");
         }
@@ -93,8 +97,10 @@ public class ReviewService {
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reseña no encontrada"));
 
-        if (dto.getComment() != null) review.setComment(dto.getComment());
-        if (dto.getRating() != null) review.setRating(dto.getRating());
+        if (dto.getComment() != null)
+            review.setComment(dto.getComment());
+        if (dto.getRating() != null)
+            review.setRating(dto.getRating());
 
         if (dto.getOrderId() != null) {
             Order order = orderRepository.findById(dto.getOrderId())
@@ -149,9 +155,23 @@ public class ReviewService {
     }
 
     private String getResourceType(Review review) {
-        if (review.getOrder() != null) return "Order";
-        if (review.getReservation() != null) return "Reservation";
-        if (review.getProduct() != null) return "Product";
+        if (review.getOrder() != null)
+            return "Order";
+        if (review.getReservation() != null)
+            return "Reservation";
+        if (review.getProduct() != null)
+            return "Product";
         return "Unknown";
+    }
+
+    public List<ReviewResponse> findRecentReviews(int limit) {
+        return reviewRepository.findRecentReviews(limit)
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    public int calculateAverageSatisfaction() {
+        return reviewRepository.calculateAverageSatisfaction();
     }
 }

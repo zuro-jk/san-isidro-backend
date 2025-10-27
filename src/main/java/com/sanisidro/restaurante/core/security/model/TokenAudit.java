@@ -1,9 +1,22 @@
 package com.sanisidro.restaurante.core.security.model;
 
-import jakarta.persistence.*;
-import lombok.*;
-
 import java.time.Instant;
+
+import com.sanisidro.restaurante.core.security.enums.TokenEventType;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "token_audit")
@@ -18,15 +31,23 @@ public class TokenAudit {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false, length = 500)
     private String token;
 
+    @Column(nullable = false)
     private String username;
 
-    private String reason;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "event_type", nullable = false)
+    private TokenEventType eventType;
 
-    private Instant blacklistedAt;
+    @Column(nullable = false)
+    private Instant timestamp;
 
+    @Column(nullable = false)
     private Instant expiresAt;
+
+    private String reason;
 
     private String ipAddress;
 

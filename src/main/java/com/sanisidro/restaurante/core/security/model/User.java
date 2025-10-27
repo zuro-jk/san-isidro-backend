@@ -160,4 +160,9 @@ public class User implements UserDetails {
         this.roles.clear();
         this.roles.addAll(position.getRoles());
     }
+
+    public boolean hasRole(String roleName) {
+        return roles.stream()
+                .anyMatch(role -> role.getName().equalsIgnoreCase(roleName));
+    }
 }

@@ -27,7 +27,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-@Entity
+@Entity(name = "CustomerOrder")
 @Table(name = "orders")
 @Getter
 @Setter
@@ -76,6 +76,21 @@ public class Order {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pickup_store_id")
     private Store pickupStore;
+
+    @Column(name = "estimated_time")
+    private Integer estimatedTime;
+
+    @Column(name = "estimated_distance")
+    private String estimatedDistance;
+
+    @Column(name = "estimated_duration")
+    private String estimatedDuration;
+
+    @Column(name = "current_latitude")
+    private Double currentLatitude;
+
+    @Column(name = "current_longitude")
+    private Double currentLongitude;
 
     @Column(name = "date", nullable = false)
     private LocalDateTime date;

@@ -1,19 +1,30 @@
 package com.sanisidro.restaurante.features.customers.model;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+
+import org.hibernate.annotations.Formula;
+
 import com.sanisidro.restaurante.core.model.Auditable;
 import com.sanisidro.restaurante.features.customers.dto.reservation.request.BaseReservationRequest;
 import com.sanisidro.restaurante.features.customers.dto.reservation.request.ReservationRequest;
 import com.sanisidro.restaurante.features.customers.enums.ReservationStatus;
 import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
-import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.Formula;
-import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "reservations")
@@ -59,13 +70,20 @@ public class Reservation extends Auditable {
     private LocalDateTime endDateTime;
 
     public void updateFromDto(BaseReservationRequest dto, Customer customer, TableEntity table) {
-        if (dto.getContactName() != null) this.contactName = dto.getContactName().trim();
-        if (dto.getContactPhone() != null) this.contactPhone = dto.getContactPhone().trim();
-        if (dto.getReservationDate() != null) this.reservationDate = dto.getReservationDate();
-        if (dto.getReservationTime() != null) this.reservationTime = dto.getReservationTime();
-        if (dto.getNumberOfPeople() != null) this.numberOfPeople = dto.getNumberOfPeople();
-        if (customer != null) this.customer = customer;
-        if (table != null) this.table = table;
+        if (dto.getContactName() != null)
+            this.contactName = dto.getContactName().trim();
+        if (dto.getContactPhone() != null)
+            this.contactPhone = dto.getContactPhone().trim();
+        if (dto.getReservationDate() != null)
+            this.reservationDate = dto.getReservationDate();
+        if (dto.getReservationTime() != null)
+            this.reservationTime = dto.getReservationTime();
+        if (dto.getNumberOfPeople() != null)
+            this.numberOfPeople = dto.getNumberOfPeople();
+        if (customer != null)
+            this.customer = customer;
+        if (table != null)
+            this.table = table;
 
         if (dto instanceof ReservationRequest req && req.getStatus() != null) {
             this.status = req.getStatus();

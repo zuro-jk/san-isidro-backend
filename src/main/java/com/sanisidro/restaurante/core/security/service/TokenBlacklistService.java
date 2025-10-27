@@ -1,15 +1,19 @@
 package com.sanisidro.restaurante.core.security.service;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.sanisidro.restaurante.core.security.dto.BlacklistedToken;
+import com.sanisidro.restaurante.core.security.enums.TokenEventType;
 import com.sanisidro.restaurante.core.security.model.TokenAudit;
 import com.sanisidro.restaurante.core.security.repository.TokenAuditRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Service;
 
-import java.time.Instant;
-import java.util.concurrent.TimeUnit;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -21,22 +25,33 @@ public class TokenBlacklistService {
     private static final String BLACKLIST_PREFIX = "blacklist:";
 
     /**
-     * Guarda un token en blacklist con información adicional.
+     * Agrega un token a la blacklist (por ejemplo, al cerrar sesión o por cierre
+     * forzado).
      */
-    public void blacklistToken(String token, String username, String reason, long expirationMillis, String ipAddress, String userAgent) {
-
+    public void blacklistToken(
+            String token,
+            String username,
+            String reason,
+            Instant expiresAt,
+            String ipAddress,
+            String userAgent) {
+        // Guardar en Redis con TTL igual al tiempo restante de expiración
+        long ttlMillis = Math.max(expiresAt.toEpochMilli() - Instant.now().toEpochMilli(), 0);
         BlacklistedToken data = new BlacklistedToken(token, username, Instant.now(), reason);
-        redisTemplate.opsForValue().set(BLACKLIST_PREFIX + token, data, expirationMillis, TimeUnit.MILLISECONDS);
+        redisTemplate.opsForValue().set(BLACKLIST_PREFIX + token, data, ttlMillis, TimeUnit.MILLISECONDS);
 
+        // Registrar evento en auditoría
         TokenAudit audit = TokenAudit.builder()
                 .token(token)
                 .username(username)
+                .eventType(TokenEventType.BLACKLISTED)
+                .timestamp(Instant.now())
+                .expiresAt(expiresAt)
                 .reason(reason)
-                .blacklistedAt(Instant.now())
-                .expiresAt(Instant.now().plusMillis(expirationMillis))
                 .ipAddress(ipAddress)
                 .userAgent(userAgent)
                 .build();
+
         tokenAuditRepository.save(audit);
     }
 
@@ -56,6 +71,26 @@ public class TokenBlacklistService {
             return bt;
         }
         return null;
+    }
+
+    @Transactional
+    public void revokeAllTokensForRoles(List<String> roleNames) {
+        Instant now = Instant.now();
+
+        List<TokenAudit> activeTokens = tokenAuditRepository.findAll().stream()
+                .filter(t -> t.getExpiresAt().isAfter(now))
+                .filter(t -> t.getEventType() != TokenEventType.BLACKLISTED)
+                .filter(t -> {
+                    return roleNames.stream().anyMatch(r -> t.getReason() != null && t.getReason().contains(r));
+                })
+                .toList();
+
+        for (TokenAudit token : activeTokens) {
+            token.setEventType(TokenEventType.BLACKLISTED);
+            token.setReason("Revocado automáticamente por fin de jornada");
+        }
+
+        tokenAuditRepository.saveAll(activeTokens);
     }
 
 }

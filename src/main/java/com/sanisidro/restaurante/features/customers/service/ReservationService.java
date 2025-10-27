@@ -7,6 +7,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -241,6 +242,42 @@ public class ReservationService {
                 .toList();
 
         return buildPagedResponse(page, content);
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponse<ReservationResponse> getReservationsByDateRange(
+            LocalDate startDate,
+            LocalDate endDate,
+            Pageable pageable) {
+
+        if (startDate == null && endDate == null) {
+            throw new IllegalArgumentException("Debe especificar al menos una fecha (inicio o fin)");
+        }
+
+        if (endDate == null) {
+            endDate = startDate;
+        } else if (startDate == null) {
+            startDate = endDate;
+        }
+
+        List<Reservation> reservations = reservationRepository.findByReservationDateBetween(startDate, endDate,
+                pageable);
+        List<ReservationResponse> responseList = reservations.stream()
+                .map(this::mapToResponse)
+                .toList();
+
+        long total = reservationRepository.countByReservationDateBetween(startDate, endDate);
+
+        int totalPages = (int) Math.ceil((double) total / pageable.getPageSize());
+        boolean last = pageable.getPageNumber() + 1 >= totalPages;
+
+        return new PagedResponse<>(
+                responseList,
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                total,
+                totalPages,
+                last);
     }
 
     /**
@@ -507,7 +544,7 @@ public class ReservationService {
                     dto.getNumberOfPeople(),
                     dto.getReservationDate(),
                     dto.getReservationTime());
-            dto.setTableId(table.getId());  
+            dto.setTableId(table.getId());
         } else {
             table = findTableById(dto.getTableId());
         }
@@ -640,6 +677,27 @@ public class ReservationService {
                 page.getTotalElements(),
                 page.getTotalPages(),
                 page.isLast());
+    }
+
+    public int countReservationsByDate(LocalDate date) {
+        return reservationRepository.countReservationsByDate(date);
+    }
+
+    public Map<LocalDate, Integer> countReservationsNext7Days() {
+        Map<LocalDate, Integer> map = new LinkedHashMap<>();
+        for (int i = 0; i < 7; i++) {
+            LocalDate day = LocalDate.now().plusDays(i);
+            int count = reservationRepository.countReservationsByDate(day);
+            map.put(day, count);
+        }
+        return map;
+    }
+
+    public List<ReservationResponse> findUpcomingReservations() {
+        return reservationRepository.findUpcomingReservations()
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
     }
 
 }

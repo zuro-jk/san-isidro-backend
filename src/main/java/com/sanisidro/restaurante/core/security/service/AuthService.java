@@ -34,15 +34,21 @@ import com.sanisidro.restaurante.core.security.dto.RegisterRequest;
 import com.sanisidro.restaurante.core.security.dto.UserProfileResponse;
 import com.sanisidro.restaurante.core.security.dto.UserSessionResponse;
 import com.sanisidro.restaurante.core.security.enums.AuthProvider;
+import com.sanisidro.restaurante.core.security.enums.TokenEventType;
 import com.sanisidro.restaurante.core.security.jwt.JwtService;
 import com.sanisidro.restaurante.core.security.model.RefreshToken;
 import com.sanisidro.restaurante.core.security.model.Role;
+import com.sanisidro.restaurante.core.security.model.TokenAudit;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.RefreshTokenRepository;
 import com.sanisidro.restaurante.core.security.repository.RoleRepository;
+import com.sanisidro.restaurante.core.security.repository.TokenAuditRepository;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
 import com.sanisidro.restaurante.features.customers.dto.customer.request.CustomerRequest;
 import com.sanisidro.restaurante.features.customers.service.CustomerService;
+import com.sanisidro.restaurante.features.employees.errors.OutOfScheduleAccessException;
+import com.sanisidro.restaurante.features.employees.repository.EmployeeRepository;
+import com.sanisidro.restaurante.features.employees.service.ScheduleService;
 import com.sanisidro.restaurante.features.notifications.dto.EmailVerificationEvent;
 import com.sanisidro.restaurante.features.notifications.kafka.NotificationProducer;
 
@@ -68,6 +74,9 @@ public class AuthService {
     private final TokenBlacklistService tokenBlacklistService;
     private final FileService fileService;
     private final CustomerService customerService;
+    private final TokenAuditRepository tokenAuditRepository;
+    private final ScheduleService scheduleService;
+    private final EmployeeRepository employeeRepository;
 
     private final NotificationProducer notificationProducer;
 
@@ -85,7 +94,6 @@ public class AuthService {
     public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         String clientIp = httpRequest.getRemoteAddr();
         String userAgent = httpRequest.getHeader("User-Agent");
-
         String key = request.getUsernameOrEmail();
 
         if (blockedUntil.containsKey(key) && blockedUntil.get(key) > System.currentTimeMillis()) {
@@ -108,19 +116,39 @@ public class AuthService {
             User user = userRepository.findByUsername(authentication.getName())
                     .orElseThrow(() -> new UserNotFoundException("Usuario no encontrado"));
 
-            RefreshToken refreshToken = createRefreshToken(user, clientIp, userAgent);
+            boolean esAdmin = user.hasRole("ROLE_ADMIN");
+            boolean esCliente = user.hasRole("ROLE_CLIENT");
 
-            Set<String> roles = user.getRoles().stream()
-                    .map(Role::getName)
-                    .collect(Collectors.toSet());
+            if (!esAdmin && !esCliente) {
+                employeeRepository.findByUserId(user.getId()).ifPresent(employee -> {
+                    boolean dentroDeHorario = scheduleService.isWithinSchedule(employee);
+                    if (!dentroDeHorario) {
+                        throw new OutOfScheduleAccessException("No puedes iniciar sesión fuera de tu horario laboral");
+                    }
+                });
+            }
+
+            RefreshToken refreshToken = createRefreshToken(user, clientIp, userAgent);
+            String accessToken = jwtService.generateAccessToken(user.getUsername(), Collections.emptyMap());
+            Instant accessTokenExpiration = jwtService.getExpirationInstant(accessToken);
+
+            TokenAudit audit = TokenAudit.builder()
+                    .token(accessToken)
+                    .username(user.getUsername())
+                    .eventType(TokenEventType.ISSUED)
+                    .timestamp(Instant.now())
+                    .expiresAt(accessTokenExpiration)
+                    .reason("Inicio de sesión exitoso")
+                    .ipAddress(clientIp)
+                    .userAgent(userAgent)
+                    .build();
+            tokenAuditRepository.save(audit);
 
             UserProfileResponse profile = buildUserProfileResponse(user);
 
-            return new AuthResponse(
-                    jwtService.generateAccessToken(user.getUsername(), Collections.emptyMap()),
-                    refreshToken.getId().toString(),
-                    profile);
-
+            return new AuthResponse(accessToken, refreshToken.getId().toString(), profile);
+        } catch (SecurityException e) {
+            throw new OutOfScheduleAccessException("No puedes iniciar sesión fuera de tu horario laboral");
         } catch (Exception ex) {
             trackFailedLogin(key, clientIp);
             throw new InvalidCredentialsException("Credenciales inválidas");
@@ -197,16 +225,12 @@ public class AuthService {
         User user = refreshToken.getUser();
 
         tokenBlacklistService.blacklistToken(refreshToken.getToken(), user.getUsername(),
-                "refresh", refreshTokenExpiration, clientIp, userAgent);
+                "refresh", refreshToken.getExpiryDate(), clientIp, userAgent);
 
         String newAccessToken = jwtService.generateAccessToken(user.getUsername(), Collections.emptyMap());
         refreshTokenRepository.delete(refreshToken);
 
         RefreshToken newRefreshToken = createRefreshToken(user, clientIp, userAgent);
-
-        Set<String> roles = user.getRoles().stream()
-                .map(Role::getName)
-                .collect(Collectors.toSet());
 
         UserProfileResponse profile = buildUserProfileResponse(user);
 
@@ -228,8 +252,14 @@ public class AuthService {
 
         revokeAllRefreshTokens(user);
 
-        long expirationMillis = jwtService.getExpirationMillis(accessToken);
-        tokenBlacklistService.blacklistToken(accessToken, username, "logout_all", expirationMillis, clientIp,
+        Instant expiresAt = jwtService.getExpirationInstant(accessToken);
+
+        tokenBlacklistService.blacklistToken(
+                accessToken,
+                username,
+                "logout_all",
+                expiresAt,
+                clientIp,
                 userAgent);
     }
 
@@ -240,10 +270,10 @@ public class AuthService {
 
         refreshTokenRepository.delete(refreshToken);
 
-        long expirationMillis = jwtService.getExpirationMillis(accessToken);
         String username = jwtService.extractUsername(accessToken);
 
-        tokenBlacklistService.blacklistToken(accessToken, username, "logout", expirationMillis, clientIp, userAgent);
+        tokenBlacklistService.blacklistToken(accessToken, username, "logout", refreshToken.getExpiryDate(), clientIp,
+                userAgent);
     }
 
     @Transactional

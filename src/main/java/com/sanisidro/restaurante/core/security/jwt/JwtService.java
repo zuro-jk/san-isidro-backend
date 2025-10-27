@@ -99,4 +99,9 @@ public class JwtService {
         long now = System.currentTimeMillis();
         return Math.max(expirationDate.getTime() - now, 0);
     }
+
+    public Instant getExpirationInstant(String token) {
+        Date expirationDate = extractExpiration(token);
+        return expirationDate.toInstant();
+    }
 }

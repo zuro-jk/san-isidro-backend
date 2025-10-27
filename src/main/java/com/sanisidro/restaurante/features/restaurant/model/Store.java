@@ -43,4 +43,11 @@ public class Store {
     @Column(name = "close_time", nullable = false)
     private LocalTime closeTime;
 
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
+
 }

@@ -1,11 +1,13 @@
 package com.sanisidro.restaurante.features.orders.dto.order.response;
 
-import com.sanisidro.restaurante.features.orders.dto.orderdetail.response.OrderDetailInOrderResponse;
-import lombok.*;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+
+import com.sanisidro.restaurante.features.orders.dto.orderdetail.response.OrderDetailInOrderResponse;
+
+import lombok.Builder;
+import lombok.Data;
 
 @Data
 @Builder
@@ -33,12 +35,22 @@ public class OrderResponse {
     private String pickupStoreName;
     private String pickupStoreAddress;
 
+    private Integer estimatedTime;
+    private String estimatedDistance;
+    private String estimatedDuration;
+
+    private Double currentLatitude;
+    private Double currentLongitude;
+
     private LocalDateTime date;
+
     private Long statusId;
     private String statusName;
     private Long typeId;
     private String typeName;
+
     private BigDecimal total;
+    
     private List<OrderDetailInOrderResponse> details;
 
 }

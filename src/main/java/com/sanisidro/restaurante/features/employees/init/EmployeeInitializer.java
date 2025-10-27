@@ -111,50 +111,50 @@ public class EmployeeInitializer implements CommandLineRunner {
             log.info(">>> Creando Horarios...");
             scheduleRepository.saveAll(List.of(
                     Schedule.builder().employee(adminEmployee).dayOfWeek(DayOfWeekEnum.MONDAY)
-                            .startTime(LocalTime.of(9, 0)).endTime(LocalTime.of(17, 0)).build(),
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
                     Schedule.builder().employee(adminEmployee).dayOfWeek(DayOfWeekEnum.TUESDAY)
-                            .startTime(LocalTime.of(9, 0)).endTime(LocalTime.of(17, 0)).build(), // Admin trabaja L-V
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(), // Admin trabaja L-V
                     Schedule.builder().employee(adminEmployee).dayOfWeek(DayOfWeekEnum.WEDNESDAY)
-                            .startTime(LocalTime.of(9, 0)).endTime(LocalTime.of(17, 0)).build(),
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
                     Schedule.builder().employee(adminEmployee).dayOfWeek(DayOfWeekEnum.THURSDAY)
-                            .startTime(LocalTime.of(9, 0)).endTime(LocalTime.of(17, 0)).build(),
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
                     Schedule.builder().employee(adminEmployee).dayOfWeek(DayOfWeekEnum.FRIDAY)
-                            .startTime(LocalTime.of(9, 0)).endTime(LocalTime.of(17, 0)).build(),
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
 
                     Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.MONDAY)
-                            .startTime(LocalTime.of(10, 0)).endTime(LocalTime.of(18, 0)).build(),
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
                     Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.TUESDAY)
-                            .startTime(LocalTime.of(10, 0)).endTime(LocalTime.of(18, 0)).build(), // Manager L-S
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(), // Manager L-S
                     Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.WEDNESDAY)
-                            .startTime(LocalTime.of(10, 0)).endTime(LocalTime.of(18, 0)).build(),
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
                     Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.THURSDAY)
-                            .startTime(LocalTime.of(10, 0)).endTime(LocalTime.of(18, 0)).build(),
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
                     Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.FRIDAY)
-                            .startTime(LocalTime.of(10, 0)).endTime(LocalTime.of(18, 0)).build(),
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
                     Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.SATURDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.of(20, 0)).build(),
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
 
                     Schedule.builder().employee(waiterEmployee).dayOfWeek(DayOfWeekEnum.WEDNESDAY)
-                            .startTime(LocalTime.of(14, 0)).endTime(LocalTime.of(22, 0)).build(), // Mesero Miér-Dom
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(), // Mesero Miér-Dom
                     Schedule.builder().employee(waiterEmployee).dayOfWeek(DayOfWeekEnum.THURSDAY)
-                            .startTime(LocalTime.of(14, 0)).endTime(LocalTime.of(22, 0)).build(),
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
                     Schedule.builder().employee(waiterEmployee).dayOfWeek(DayOfWeekEnum.FRIDAY)
-                            .startTime(LocalTime.of(16, 0)).endTime(LocalTime.of(0, 0)).build(), // Turno noche
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(), // Turno noche
                     Schedule.builder().employee(waiterEmployee).dayOfWeek(DayOfWeekEnum.SATURDAY)
-                            .startTime(LocalTime.of(16, 0)).endTime(LocalTime.of(0, 0)).build(),
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
                     Schedule.builder().employee(waiterEmployee).dayOfWeek(DayOfWeekEnum.SUNDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.of(20, 0)).build(),
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
 
                     Schedule.builder().employee(chefEmployee).dayOfWeek(DayOfWeekEnum.TUESDAY)
-                            .startTime(LocalTime.of(11, 0)).endTime(LocalTime.of(19, 0)).build(), // Chef Mar-Sáb
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(), // Chef Mar-Sáb
                     Schedule.builder().employee(chefEmployee).dayOfWeek(DayOfWeekEnum.WEDNESDAY)
-                            .startTime(LocalTime.of(11, 0)).endTime(LocalTime.of(19, 0)).build(),
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
                     Schedule.builder().employee(chefEmployee).dayOfWeek(DayOfWeekEnum.THURSDAY)
-                            .startTime(LocalTime.of(11, 0)).endTime(LocalTime.of(19, 0)).build(),
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
                     Schedule.builder().employee(chefEmployee).dayOfWeek(DayOfWeekEnum.FRIDAY)
-                            .startTime(LocalTime.of(11, 0)).endTime(LocalTime.of(19, 0)).build(),
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
                     Schedule.builder().employee(chefEmployee).dayOfWeek(DayOfWeekEnum.SATURDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.of(20, 0)).build()));
+                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build()));
             log.info(">>> Horarios inicializados correctamente.");
         }
     }
