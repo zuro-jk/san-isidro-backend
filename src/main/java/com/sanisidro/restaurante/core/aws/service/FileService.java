@@ -1,5 +1,26 @@
 package com.sanisidro.restaurante.core.aws.service;
 
+import java.awt.image.BufferedImage;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDateTime;
+import java.util.HexFormat;
+
+import javax.imageio.ImageIO;
+
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
 import com.sanisidro.restaurante.core.aws.dto.response.DeleteResponse;
 import com.sanisidro.restaurante.core.aws.exception.AccessDeniedException;
 import com.sanisidro.restaurante.core.aws.exception.FileNotFoundException;
@@ -10,20 +31,8 @@ import com.sanisidro.restaurante.core.aws.repository.FileMetadataRepository;
 import com.sanisidro.restaurante.core.config.FileProperties;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.*;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.time.LocalDateTime;
-import java.util.HexFormat;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -36,9 +45,12 @@ public class FileService {
 
     private long getMaxFileSize() {
         String size = fileProperties.getMaxSize().toUpperCase();
-        if (size.endsWith("MB")) return Long.parseLong(size.replace("MB", "")) * 1024 * 1024;
-        if (size.endsWith("KB")) return Long.parseLong(size.replace("KB", "")) * 1024;
-        if (size.endsWith("B")) return Long.parseLong(size.replace("B", ""));
+        if (size.endsWith("MB"))
+            return Long.parseLong(size.replace("MB", "")) * 1024 * 1024;
+        if (size.endsWith("KB"))
+            return Long.parseLong(size.replace("KB", "")) * 1024;
+        if (size.endsWith("B"))
+            return Long.parseLong(size.replace("B", ""));
         return 5 * 1024 * 1024;
     }
 
@@ -103,7 +115,8 @@ public class FileService {
         } catch (IOException e) {
             throw new FileUploadException("Error procesando el archivo: " + e.getMessage());
         } finally {
-            if (tempFile != null && tempFile.exists()) tempFile.delete();
+            if (tempFile != null && tempFile.exists())
+                tempFile.delete();
         }
     }
 
@@ -126,14 +139,17 @@ public class FileService {
     }
 
     private void validateFile(MultipartFile file) {
-        if (file.isEmpty()) throw new FileUploadException("El archivo está vacío");
+        if (file.isEmpty())
+            throw new FileUploadException("El archivo está vacío");
         if (file.getSize() > getMaxFileSize())
-            throw new FileUploadException("El archivo excede el tamaño máximo permitido de " + fileProperties.getMaxSize());
+            throw new FileUploadException(
+                    "El archivo excede el tamaño máximo permitido de " + fileProperties.getMaxSize());
 
         String originalName = file.getOriginalFilename();
         String contentType = file.getContentType();
 
-        if (originalName == null || fileProperties.getAllowedExtensions().stream().noneMatch(originalName.toLowerCase()::endsWith)) {
+        if (originalName == null
+                || fileProperties.getAllowedExtensions().stream().noneMatch(originalName.toLowerCase()::endsWith)) {
             throw new FileUploadException("Extensión no permitida: " + originalName);
         }
 
@@ -164,8 +180,7 @@ public class FileService {
                     "-v", "error",
                     "-show_entries", "format=duration",
                     "-of", "default=noprint_wrappers=1:nokey=1",
-                    file.getAbsolutePath()
-            );
+                    file.getAbsolutePath());
             pb.redirectErrorStream(true);
 
             Process process = pb.start();
@@ -175,7 +190,8 @@ public class FileService {
             }
             process.waitFor();
 
-            if (output != null) return Double.parseDouble(output.trim());
+            if (output != null)
+                return Double.parseDouble(output.trim());
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -200,6 +216,21 @@ public class FileService {
         FileMetadata file = fileRepository.findById(fileId)
                 .orElseThrow(() -> new FileNotFoundException("Archivo no encontrado con id: " + fileId));
         return file.getUrl();
+    }
+
+    @Transactional
+    public void deleteFileByUrl(String url) {
+        if (url == null || url.isBlank())
+            return;
+
+        fileRepository.findByUrl(url).ifPresent(file -> {
+            try {
+                s3Service.deleteFile(file.getKey());
+                fileRepository.delete(file);
+            } catch (Exception e) {
+                throw new RuntimeException("Error eliminando archivo de AWS: " + e.getMessage());
+            }
+        });
     }
 
 }

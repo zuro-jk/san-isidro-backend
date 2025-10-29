@@ -43,7 +43,7 @@ public class PaymentController {
 
         @PostMapping("/online")
         public ResponseEntity<ApiResponse<PaymentResponse>> createOnlinePayment(
-                        @RequestBody @Valid OnlineCheckoutRequest request) {
+                        @RequestBody @Valid OnlineCheckoutRequest request) throws Exception {
 
                 PaymentResponse response = paymentService.createOnlinePayment(request);
                 return ResponseEntity.status(HttpStatus.CREATED).body(

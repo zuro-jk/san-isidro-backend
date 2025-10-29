@@ -41,6 +41,8 @@ public class ProductRequest {
     @Min(value = 1, message = "El tiempo de preparación debe ser mayor a 0 minutos")
     private Integer preparationTimeMinutes;
 
+    private Boolean active;
+
     @Valid
     private List<ProductIngredientRequest> ingredients;
 }

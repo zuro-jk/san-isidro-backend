@@ -5,7 +5,6 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.SQLRestriction;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -26,7 +25,6 @@ import lombok.Setter;
 @Entity
 @Table(name = "products")
 @SQLDelete(sql = "UPDATE products SET is_active = false WHERE product_id = ?")
-@SQLRestriction("is_active = true")
 @Getter
 @Setter
 @NoArgsConstructor
