@@ -11,11 +11,13 @@ import org.springframework.stereotype.Component;
 import com.sanisidro.restaurante.features.orders.model.OrderStatus;
 import com.sanisidro.restaurante.features.orders.model.OrderStatusTranslation;
 import com.sanisidro.restaurante.features.orders.model.OrderType;
+import com.sanisidro.restaurante.features.orders.model.OrderTypeStatusFlow;
 import com.sanisidro.restaurante.features.orders.model.OrderTypeTranslation;
 import com.sanisidro.restaurante.features.orders.model.PaymentMethod;
 import com.sanisidro.restaurante.features.orders.model.PaymentMethodTranslation;
 import com.sanisidro.restaurante.features.orders.repository.OrderStatusRepository;
 import com.sanisidro.restaurante.features.orders.repository.OrderTypeRepository;
+import com.sanisidro.restaurante.features.orders.repository.OrderTypeStatusFlowRepository;
 import com.sanisidro.restaurante.features.orders.repository.PaymentMethodRepository;
 import com.sanisidro.restaurante.features.orders.repository.PaymentMethodTranslationRepository;
 
@@ -31,6 +33,7 @@ public class OrderInitializer implements CommandLineRunner {
 
         private final OrderStatusRepository orderStatusRepository;
         private final OrderTypeRepository orderTypeRepository;
+        private final OrderTypeStatusFlowRepository orderTypeStatusFlowRepository;
         private final PaymentMethodRepository paymentMethodRepository;
         private final PaymentMethodTranslationRepository paymentMethodTranslationRepository;
 
@@ -39,6 +42,7 @@ public class OrderInitializer implements CommandLineRunner {
                 initOrderStatuses();
                 initOrderTypes();
                 initPaymentMethods();
+                initOrderFlows();
         }
 
         private void initOrderStatuses() {
@@ -81,9 +85,9 @@ public class OrderInitializer implements CommandLineRunner {
 
                 OrderStatus confirmed = OrderStatus.builder().code("CONFIRMED").build();
                 confirmed.getTranslations().addAll(List.of(
-                                OrderStatusTranslation.builder().orderStatus(confirmed).lang("en").name("Completed")
+                                OrderStatusTranslation.builder().orderStatus(confirmed).lang("en").name("Confirmed")
                                                 .description("Order payment has been confirmed").build(),
-                                OrderStatusTranslation.builder().orderStatus(confirmed).lang("es").name("Completado")
+                                OrderStatusTranslation.builder().orderStatus(confirmed).lang("es").name("Confirmado")
                                                 .description("El pago del pedido ha sido confirmado").build()));
 
                 OrderStatus cancelled = OrderStatus.builder().code("CANCELLED").build();
@@ -251,6 +255,57 @@ public class OrderInitializer implements CommandLineRunner {
                 paymentMethodTranslationRepository.saveAll(translations);
 
                 log.info(">>> Métodos de pago inicializados correctamente");
+        }
+
+        private void initOrderFlows() {
+                if (orderTypeStatusFlowRepository.count() > 0) {
+                        log.info(">>> Flujos de Estado de Órdenes ya inicializados");
+                        return;
+                }
+
+                log.info(">>> Inicializando Flujos de Estado de Órdenes...");
+
+                // --- Cargar Tipos de Orden ---
+                OrderType deliveryType = orderTypeRepository.findByCode("DELIVERY").orElseThrow();
+                OrderType dineInType = orderTypeRepository.findByCode("DINE_IN").orElseThrow();
+                OrderType takeAwayType = orderTypeRepository.findByCode("TAKE_AWAY").orElseThrow();
+
+                // --- Cargar Estados ---
+                OrderStatus pending = orderStatusRepository.findByCode("PENDING").orElseThrow();
+                OrderStatus confirmed = orderStatusRepository.findByCode("CONFIRMED").orElseThrow();
+                OrderStatus inProgress = orderStatusRepository.findByCode("IN_PROGRESS").orElseThrow();
+                OrderStatus outForDelivery = orderStatusRepository.findByCode("OUT_FOR_DELIVERY").orElseThrow();
+                OrderStatus delivered = orderStatusRepository.findByCode("DELIVERED").orElseThrow();
+                OrderStatus readyForPickup = orderStatusRepository.findByCode("READY_FOR_PICKUP").orElseThrow();
+                OrderStatus completed = orderStatusRepository.findByCode("COMPLETED").orElseThrow();
+
+                // --- 1. Flujo para "DELIVERY" (Entrega a domicilio) ---
+                List<OrderTypeStatusFlow> deliveryFlow = List.of(
+                                new OrderTypeStatusFlow(null, deliveryType, pending, 0),
+                                new OrderTypeStatusFlow(null, deliveryType, confirmed, 1),
+                                new OrderTypeStatusFlow(null, deliveryType, inProgress, 2),
+                                new OrderTypeStatusFlow(null, deliveryType, outForDelivery, 3),
+                                new OrderTypeStatusFlow(null, deliveryType, delivered, 4));
+                orderTypeStatusFlowRepository.saveAll(deliveryFlow);
+
+                // --- 2. Flujo para "TAKE_AWAY" (Para llevar) ---
+                List<OrderTypeStatusFlow> takeAwayFlow = List.of(
+                                new OrderTypeStatusFlow(null, takeAwayType, pending, 0),
+                                new OrderTypeStatusFlow(null, takeAwayType, confirmed, 1),
+                                new OrderTypeStatusFlow(null, takeAwayType, inProgress, 2),
+                                new OrderTypeStatusFlow(null, takeAwayType, readyForPickup, 3),
+                                new OrderTypeStatusFlow(null, takeAwayType, completed, 4));
+                orderTypeStatusFlowRepository.saveAll(takeAwayFlow);
+
+                // --- 3. Flujo para "DINE_IN" (En restaurante) ---
+                List<OrderTypeStatusFlow> dineInFlow = List.of(
+                                new OrderTypeStatusFlow(null, dineInType, pending, 0),
+                                new OrderTypeStatusFlow(null, dineInType, confirmed, 1),
+                                new OrderTypeStatusFlow(null, dineInType, inProgress, 2),
+                                new OrderTypeStatusFlow(null, dineInType, completed, 3));
+                orderTypeStatusFlowRepository.saveAll(dineInFlow);
+
+                log.info(">>> Flujos de Estado inicializados.");
         }
 
 }

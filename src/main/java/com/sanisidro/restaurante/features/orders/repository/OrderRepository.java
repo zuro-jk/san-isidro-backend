@@ -42,4 +42,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                 GROUP BY tr.name
             """)
     List<Object[]> findOrderTypeStatistics(@Param("lang") String lang);
+
+    boolean existsByIdAndCustomer_Id(Long id, Long customerId);
 }

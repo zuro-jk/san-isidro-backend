@@ -1,19 +1,19 @@
 package com.sanisidro.restaurante.features.customers.dto.review.request;
 
-import com.sanisidro.restaurante.features.customers.validation.review.OneReviewPerResource;
-import jakarta.validation.constraints.*;
-import lombok.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-@OneReviewPerResource
 public class ReviewRequest {
     private Long id;
-
-    @NotNull(message = "El ID del cliente es obligatorio")
-    private Long customerId;
 
     private Long orderId;
     private Long reservationId;

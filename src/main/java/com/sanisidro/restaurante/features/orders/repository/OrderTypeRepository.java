@@ -1,8 +1,11 @@
 package com.sanisidro.restaurante.features.orders.repository;
 
-import com.sanisidro.restaurante.features.orders.model.OrderType;
+import java.util.Optional;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface OrderTypeRepository extends JpaRepository<OrderType, Long> {
+import com.sanisidro.restaurante.features.orders.model.OrderType;
 
+public interface OrderTypeRepository extends JpaRepository<OrderType, Long> {
+    Optional<OrderType> findByCode(String code);
 }

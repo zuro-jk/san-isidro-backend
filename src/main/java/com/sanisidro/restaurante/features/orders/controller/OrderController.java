@@ -3,6 +3,7 @@ package com.sanisidro.restaurante.features.orders.controller;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,7 +17,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
 import com.sanisidro.restaurante.core.security.model.User;
+import com.sanisidro.restaurante.features.orders.dto.order.request.AssignDriverRequest;
 import com.sanisidro.restaurante.features.orders.dto.order.request.OrderRequest;
+import com.sanisidro.restaurante.features.orders.dto.order.request.UpdateLocationRequest;
+import com.sanisidro.restaurante.features.orders.dto.order.request.UpdateStatusRequest;
 import com.sanisidro.restaurante.features.orders.dto.order.response.OrderResponse;
 import com.sanisidro.restaurante.features.orders.dto.payment.request.PaymentInOrderRequest;
 import com.sanisidro.restaurante.features.orders.service.OrderService;
@@ -68,10 +72,27 @@ public class OrderController {
     public ResponseEntity<ApiResponse<OrderResponse>> create(
             @Valid @RequestBody OrderRequest request,
             @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang,
-            @AuthenticationPrincipal User user
-            ) {
+            @AuthenticationPrincipal User user) {
         OrderResponse order = orderService.create(user, request, lang);
         return ResponseEntity.ok(new ApiResponse<>(true, "Orden creada correctamente", order));
+    }
+
+    @PostMapping("/{id}/payments/local")
+    public ResponseEntity<ApiResponse<Void>> addLocalPayment(
+            @PathVariable Long id,
+            @Valid @RequestBody PaymentInOrderRequest request) {
+        orderService.addLocalPayment(id, request);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Pago local registrado correctamente", null));
+    }
+
+    @PostMapping("/{id}/location")
+    @PreAuthorize("hasRole('ROLE_EMPLOYEE')")
+    public ResponseEntity<ApiResponse<Void>> updateLocation(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateLocationRequest request,
+            @AuthenticationPrincipal User authenticatedUser) {
+        orderService.updateDeliveryLocation(id, request, authenticatedUser);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Ubicación actualizada", null));
     }
 
     @PutMapping("/{id}")
@@ -92,17 +113,32 @@ public class OrderController {
         return ResponseEntity.ok(new ApiResponse<>(true, "Orden cancelada correctamente", cancelledOrder));
     }
 
+    @PutMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_EMPLOYEE')")
+    public ResponseEntity<ApiResponse<OrderResponse>> updateStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateStatusRequest request,
+            @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang) {
+
+        OrderResponse order = orderService.updateStatus(id, request, lang);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Estado de la orden actualizado", order));
+    }
+
+    @PutMapping("/{id}/assign-driver")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<ApiResponse<OrderResponse>> assignDriver(
+            @PathVariable Long id,
+            @Valid @RequestBody AssignDriverRequest request,
+            @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang) {
+
+        OrderResponse order = orderService.assignDriver(id, request, lang);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Repartidor asignado correctamente", order));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         orderService.delete(id);
         return ResponseEntity.ok(new ApiResponse<>(true, "Orden eliminada correctamente", null));
     }
 
-    @PostMapping("/{id}/payments/local")
-    public ResponseEntity<ApiResponse<Void>> addLocalPayment(
-            @PathVariable Long id,
-            @Valid @RequestBody PaymentInOrderRequest request) {
-        orderService.addLocalPayment(id, request);
-        return ResponseEntity.ok(new ApiResponse<>(true, "Pago local registrado correctamente", null));
-    }
 }

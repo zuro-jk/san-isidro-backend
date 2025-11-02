@@ -1,6 +1,7 @@
 package com.sanisidro.restaurante.features.customers.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -15,6 +16,10 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     // Obtener reviews por cliente
     List<Review> findByCustomerId(Long customerId);
 
+    Optional<Review> findByIdAndCustomer_Id(Long reviewId, Long customerId);
+
+    boolean existsByIdAndCustomer_Id(Long reviewId, Long customerId);
+    
     // Validaciones para review por Orden
     boolean existsByCustomer_IdAndOrder_Id(Long customerId, Long orderId);
 

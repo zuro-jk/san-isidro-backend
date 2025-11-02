@@ -1,7 +1,11 @@
 package com.sanisidro.restaurante.features.customers.dto.review.response;
 
 import java.time.LocalDateTime;
-import lombok.*;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @AllArgsConstructor

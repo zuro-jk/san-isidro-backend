@@ -3,13 +3,16 @@ package com.sanisidro.restaurante.features.orders.service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,10 +27,14 @@ import com.sanisidro.restaurante.features.notifications.dto.OrderNotificationEve
 import com.sanisidro.restaurante.features.notifications.dto.StockLowNotificationEvent;
 import com.sanisidro.restaurante.features.notifications.kafka.NotificationProducer;
 import com.sanisidro.restaurante.features.notifications.templates.EmailTemplateBuilder;
+import com.sanisidro.restaurante.features.orders.dto.order.request.AssignDriverRequest;
 import com.sanisidro.restaurante.features.orders.dto.order.request.DeliveryAddressRequest;
 import com.sanisidro.restaurante.features.orders.dto.order.request.OrderRequest;
+import com.sanisidro.restaurante.features.orders.dto.order.request.UpdateLocationRequest;
+import com.sanisidro.restaurante.features.orders.dto.order.request.UpdateStatusRequest;
 import com.sanisidro.restaurante.features.orders.dto.order.response.OrderCreatedEvent;
 import com.sanisidro.restaurante.features.orders.dto.order.response.OrderResponse;
+import com.sanisidro.restaurante.features.orders.dto.order.response.OrderStatusStepResponse;
 import com.sanisidro.restaurante.features.orders.dto.orderdetail.request.OrderDetailInOrderRequest;
 import com.sanisidro.restaurante.features.orders.dto.orderdetail.response.OrderDetailInOrderResponse;
 import com.sanisidro.restaurante.features.orders.dto.payment.request.PaymentInOrderRequest;
@@ -360,6 +367,107 @@ public class OrderService {
                 return mapToResponse(orderRepository.save(order), lang);
         }
 
+        /**
+         * Actualiza solo el estado de un pedido.
+         * La seguridad ya fue validada en el Controlador.
+         */
+        @Transactional
+        public OrderResponse updateStatus(Long id, UpdateStatusRequest request, String lang) {
+                log.info("Actualizando estado para orden {} al estado: {}", id, request.getNewStatusCode());
+
+                Order order = orderRepository.findById(id)
+                                .orElseThrow(() -> new EntityNotFoundException("Orden no encontrada con id: " + id));
+
+                // ¡Ahora esto funciona gracias al paso 2!
+                OrderStatus newStatus = statusRepository.findByCode(request.getNewStatusCode())
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Estado de orden no encontrado con código: "
+                                                                + request.getNewStatusCode()));
+
+                order.setStatus(newStatus);
+                Order savedOrder = orderRepository.save(order);
+
+                // TODO: Enviar notificación al cliente sobre el cambio de estado
+                // notificationProducer.sendOrderStatusUpdate(savedOrder, newStatus.getCode());
+
+                log.info("Orden {} actualizada al estado: {}", savedOrder.getId(), newStatus.getCode());
+                return mapToResponse(savedOrder, lang);
+        }
+
+        /**
+         * Asigna un repartidor a un pedido.
+         * La seguridad ya fue validada en el Controlador.
+         */
+        @Transactional
+        public OrderResponse assignDriver(Long id, AssignDriverRequest request, String lang) {
+                log.info("Asignando repartidor {} a la orden {}", request.getEmployeeId(), id);
+
+                Order order = orderRepository.findById(id)
+                                .orElseThrow(() -> new EntityNotFoundException("Orden no encontrada con id: " + id));
+
+                Employee driver = employeeRepository.findById(request.getEmployeeId())
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Empleado (repartidor) no encontrado con id: "
+                                                                + request.getEmployeeId()));
+
+                // Asumiendo que tienes un estado "OUT_FOR_DELIVERY"
+                OrderStatus outForDeliveryStatus = statusRepository.findByCode("OUT_FOR_DELIVERY")
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Estado 'OUT_FOR_DELIVERY' no encontrado"));
+
+                order.setEmployee(driver);
+                order.setStatus(outForDeliveryStatus); // También actualiza el estado
+
+                // Re-calculamos la info de tracking (distancia/duración)
+                // Reusamos la lógica que ya tenías en getTrackingInfo
+                Order savedOrder = orderRepository.save(order);
+
+                // TODO: Enviar notificación al cliente "¡Tu pedido está en camino!"
+                // notificationProducer.sendOrderOutForDelivery(savedOrder);
+
+                log.info("Repartidor {} asignado a la orden {}", driver.getId(), savedOrder.getId());
+
+                // Devolvemos la info actualizada
+                return getTrackingInfo(savedOrder.getId(), lang);
+        }
+
+        /**
+         * Actualiza la ubicación GPS del repartidor para una orden.
+         * La seguridad de ROL_EMPLOYEE fue validada en el controlador.
+         * ¡PERO! Aún debemos validar que el empleado sea el CORRECTO.
+         */
+        @Transactional
+        public void updateDeliveryLocation(Long id, UpdateLocationRequest request, User authenticatedUser) {
+
+                Order order = orderRepository.findById(id)
+                                .orElseThrow(() -> new EntityNotFoundException("Orden no encontrada con id: " + id));
+
+                if (order.getEmployee() == null) {
+                        log.warn("Intento de actualizar ubicación en orden {} sin repartidor asignado.", id);
+                        throw new AccessDeniedException("Esta orden no tiene un repartidor asignado.");
+                }
+
+                if (!order.getEmployee().getUser().getId().equals(authenticatedUser.getId())) {
+                        log.warn("Intento no autorizado de actualizar ubicación. Orden: {}, Repartidor Asignado: {}, Repartidor Autenticado: {}",
+                                        id, order.getEmployee().getId(), authenticatedUser.getId());
+                        throw new AccessDeniedException(
+                                        "No estás autorizado para actualizar la ubicación de esta orden.");
+                }
+
+                // Si pasó la seguridad, actualizamos las coordenadas
+                order.setCurrentLatitude(request.getLatitude());
+                order.setCurrentLongitude(request.getLongitude());
+                orderRepository.save(order);
+
+                // (Opcional) Aquí es donde notificarías al cliente en tiempo real
+                // via WebSockets.
+                // notificationProducer.sendDeliveryLocationUpdate(id, request.getLatitude(),
+                // request.getLongitude());
+
+                log.debug("Ubicación actualizada para orden {}: ({}, {})", id, request.getLatitude(),
+                                request.getLongitude());
+        }
+
         @Transactional
         public void delete(Long id) {
                 Order order = orderRepository.findById(id)
@@ -606,6 +714,18 @@ public class OrderService {
         }
 
         private OrderResponse mapToResponse(Order order, String lang) {
+                List<OrderStatusStepResponse> timeline = new ArrayList<>();
+                if (order.getType() != null && order.getType().getStatusFlow() != null) {
+
+                        timeline = order.getType().getStatusFlow().stream()
+                                        .map(flowStep -> OrderStatusStepResponse.builder()
+                                                        .code(flowStep.getOrderStatus().getCode())
+                                                        .name(getStatusName(flowStep.getOrderStatus(), lang))
+                                                        .step(flowStep.getStepOrder())
+                                                        .build())
+                                        .collect(Collectors.toList());
+                }
+
                 OrderResponse.OrderResponseBuilder responseBuilder = OrderResponse.builder()
                                 .id(order.getId())
                                 .customerId(order.getCustomer().getId())
@@ -632,7 +752,8 @@ public class OrderService {
                                 .estimatedDistance(order.getEstimatedDistance())
                                 .estimatedDuration(order.getEstimatedDuration())
                                 .currentLatitude(order.getCurrentLatitude())
-                                .currentLongitude(order.getCurrentLongitude());
+                                .currentLongitude(order.getCurrentLongitude())
+                                .timelineSteps(timeline);
                 ;
 
                 String orderTypeCode = order.getType().getCode() != null ? order.getType().getCode().toUpperCase() : "";

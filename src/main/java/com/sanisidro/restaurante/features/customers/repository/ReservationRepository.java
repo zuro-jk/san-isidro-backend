@@ -46,4 +46,6 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
         List<Reservation> findByReservationDateBetween(LocalDate startDate, LocalDate endDate, Pageable pageable);
 
         long countByReservationDateBetween(LocalDate startDate, LocalDate endDate);
+
+        boolean existsByIdAndCustomer_Id(Long id, Long customerId);
 }

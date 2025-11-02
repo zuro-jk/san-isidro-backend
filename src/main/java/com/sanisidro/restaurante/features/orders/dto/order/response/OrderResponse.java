@@ -53,4 +53,6 @@ public class OrderResponse {
     
     private List<OrderDetailInOrderResponse> details;
 
+    private List<OrderStatusStepResponse> timelineSteps;
+
 }
