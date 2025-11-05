@@ -32,7 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 @Profile("dev")
 @RequiredArgsConstructor
 @Slf4j
-@Order(4)
+@Order(5)
 public class ProductInitializer implements CommandLineRunner {
 
         private final CategoryRepository categoryRepository;

@@ -2,6 +2,7 @@ package com.sanisidro.restaurante.core.security.init;
 
 import java.util.Collections;
 import java.util.Set;
+import java.util.UUID;
 
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
@@ -37,6 +38,7 @@ public class SecurityInitializer implements CommandLineRunner {
         initBaseEmployeeUsers();
         initSupplierUsers();
         initTestCustomerUsers();
+        initDefaultCustomerUser();
     }
 
     private void initRoles() {
@@ -173,5 +175,35 @@ public class SecurityInitializer implements CommandLineRunner {
                     .build();
             return userRepository.save(newUser);
         });
+    }
+
+    private void initDefaultCustomerUser() {
+        final String DEFAULT_USERNAME = "publico_general";
+
+        if (userRepository.findByUsername(DEFAULT_USERNAME).isPresent()) {
+            log.info(">>> Usuario 'publico_general' ya existe.");
+            return;
+        }
+        log.info(">>> Creando usuario 'publico_general'...");
+
+        Role clientRole = roleRepository.findByName("ROLE_CLIENT")
+                .orElseThrow(() -> new IllegalStateException("ROLE_CLIENT no encontrado"));
+
+        String randomPassword = passwordEncoder.encode(UUID.randomUUID().toString());
+
+        User defaultUser = User.builder()
+                .username(DEFAULT_USERNAME)
+                .email("ventas@" + System.currentTimeMillis() + ".com")
+                .firstName("Público")
+                .lastName("General")
+                .password(randomPassword)
+                .roles(Collections.singleton(clientRole))
+                .provider(AuthProvider.LOCAL)
+                .enabled(true)
+                .emailVerified(true)
+                .build();
+
+        userRepository.save(defaultUser);
+        log.info(">>> Usuario 'publico_general' creado.");
     }
 }

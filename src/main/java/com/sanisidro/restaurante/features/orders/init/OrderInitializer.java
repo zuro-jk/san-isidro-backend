@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 @Profile("dev")
 @RequiredArgsConstructor
 @Slf4j
-@Order(6)
+@Order(7)
 public class OrderInitializer implements CommandLineRunner {
 
         private final OrderStatusRepository orderStatusRepository;
@@ -59,6 +59,17 @@ public class OrderInitializer implements CommandLineRunner {
                                                 .description("Order has been placed but not processed yet").build(),
                                 OrderStatusTranslation.builder().orderStatus(pending).lang("es").name("Pendiente")
                                                 .description("El pedido ha sido realizado pero no procesado").build()));
+
+                OrderStatus pendingConfirm = OrderStatus.builder().code("PENDING_CONFIRMATION").build();
+                pendingConfirm.getTranslations().addAll(List.of(
+                                OrderStatusTranslation.builder().orderStatus(pendingConfirm).lang("en")
+                                                .name("Pending Confirmation")
+                                                .description("Order placed, awaiting manual confirmation by staff")
+                                                .build(),
+                                OrderStatusTranslation.builder().orderStatus(pendingConfirm).lang("es")
+                                                .name("Pendiente de Confirmación")
+                                                .description("Pedido realizado, esperando confirmación manual del personal")
+                                                .build()));
 
                 OrderStatus inProgress = OrderStatus.builder().code("IN_PROGRESS").build();
                 inProgress.getTranslations().addAll(List.of(
@@ -120,7 +131,7 @@ public class OrderInitializer implements CommandLineRunner {
                                                 .name("Entregado").description("El pedido ha sido entregado").build()));
 
                 List<OrderStatus> statuses = List.of(pending, inProgress, readyForPickup, confirmed, cancelled, failed,
-                                outForDelivery, delivered, completed);
+                                outForDelivery, delivered, completed, pendingConfirm);
                 orderStatusRepository.saveAll(statuses);
 
                 statuses.forEach(s -> log.info(">>> OrderStatus '{}' inicializado con traducciones", s.getCode()));
@@ -271,6 +282,7 @@ public class OrderInitializer implements CommandLineRunner {
                 OrderType takeAwayType = orderTypeRepository.findByCode("TAKE_AWAY").orElseThrow();
 
                 // --- Cargar Estados ---
+                OrderStatus pendingConfirm = orderStatusRepository.findByCode("PENDING_CONFIRMATION").orElseThrow();
                 OrderStatus pending = orderStatusRepository.findByCode("PENDING").orElseThrow();
                 OrderStatus confirmed = orderStatusRepository.findByCode("CONFIRMED").orElseThrow();
                 OrderStatus inProgress = orderStatusRepository.findByCode("IN_PROGRESS").orElseThrow();
@@ -281,25 +293,25 @@ public class OrderInitializer implements CommandLineRunner {
 
                 // --- 1. Flujo para "DELIVERY" (Entrega a domicilio) ---
                 List<OrderTypeStatusFlow> deliveryFlow = List.of(
-                                new OrderTypeStatusFlow(null, deliveryType, pending, 0),
-                                new OrderTypeStatusFlow(null, deliveryType, confirmed, 1),
-                                new OrderTypeStatusFlow(null, deliveryType, inProgress, 2),
-                                new OrderTypeStatusFlow(null, deliveryType, outForDelivery, 3),
-                                new OrderTypeStatusFlow(null, deliveryType, delivered, 4));
+                                new OrderTypeStatusFlow(null, deliveryType, pendingConfirm, 0),
+                                new OrderTypeStatusFlow(null, deliveryType, pending, 1),
+                                new OrderTypeStatusFlow(null, deliveryType, confirmed, 2),
+                                new OrderTypeStatusFlow(null, deliveryType, inProgress, 3),
+                                new OrderTypeStatusFlow(null, deliveryType, outForDelivery, 4),
+                                new OrderTypeStatusFlow(null, deliveryType, delivered, 5));
                 orderTypeStatusFlowRepository.saveAll(deliveryFlow);
 
                 // --- 2. Flujo para "TAKE_AWAY" (Para llevar) ---
                 List<OrderTypeStatusFlow> takeAwayFlow = List.of(
-                                new OrderTypeStatusFlow(null, takeAwayType, pending, 0),
+                                new OrderTypeStatusFlow(null, takeAwayType, pendingConfirm, 0),
                                 new OrderTypeStatusFlow(null, takeAwayType, confirmed, 1),
                                 new OrderTypeStatusFlow(null, takeAwayType, inProgress, 2),
                                 new OrderTypeStatusFlow(null, takeAwayType, readyForPickup, 3),
                                 new OrderTypeStatusFlow(null, takeAwayType, completed, 4));
                 orderTypeStatusFlowRepository.saveAll(takeAwayFlow);
-
                 // --- 3. Flujo para "DINE_IN" (En restaurante) ---
                 List<OrderTypeStatusFlow> dineInFlow = List.of(
-                                new OrderTypeStatusFlow(null, dineInType, pending, 0),
+                                new OrderTypeStatusFlow(null, dineInType, pendingConfirm, 0),
                                 new OrderTypeStatusFlow(null, dineInType, confirmed, 1),
                                 new OrderTypeStatusFlow(null, dineInType, inProgress, 2),
                                 new OrderTypeStatusFlow(null, dineInType, completed, 3));

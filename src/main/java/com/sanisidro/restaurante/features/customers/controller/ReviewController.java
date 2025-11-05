@@ -12,12 +12,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.sanisidro.restaurante.core.exceptions.ResourceNotFoundException;
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.features.customers.dto.review.request.ReviewRequest;
 import com.sanisidro.restaurante.features.customers.dto.review.response.ReviewResponse;
+import com.sanisidro.restaurante.features.customers.model.Customer;
 import com.sanisidro.restaurante.features.customers.service.ReviewService;
 
 import jakarta.validation.Valid;
@@ -40,6 +43,17 @@ public class ReviewController {
     public ResponseEntity<ApiResponse<List<ReviewResponse>>> getReviewsByCustomer(@PathVariable Long customerId) {
         List<ReviewResponse> reviews = reviewService.getReviewsByCustomer(customerId);
         return ResponseEntity.ok(new ApiResponse<>(true, "Reseñas del cliente obtenidas correctamente", reviews));
+    }
+
+    @GetMapping("/check")
+    public ResponseEntity<ApiResponse<Boolean>> checkIfReviewed(
+            @AuthenticationPrincipal User user,
+            @RequestParam(required = false) Long orderId,
+            @RequestParam(required = false) Long productId,
+            @RequestParam(required = false) Long reservationId) {
+
+        boolean exists = reviewService.hasCustomerReviewed(user, orderId, productId, reservationId);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Verificación completada", exists));
     }
 
     @PostMapping

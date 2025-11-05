@@ -13,12 +13,12 @@ import com.sanisidro.restaurante.core.kafka.message.KafkaMessage;
 import com.sanisidro.restaurante.features.notifications.dto.NotifiableEvent;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class NotificationProducer {
-
-    private static final Logger logger = LoggerFactory.getLogger(NotificationProducer.class);
 
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
@@ -38,11 +38,11 @@ public class NotificationProducer {
 
             kafkaTemplate.send(topic, message.getKey(), envelope);
 
-            logger.info("📤 Evento publicado en Kafka: topic={}, key={}, payload={}",
+            log.info("📤 Evento publicado en Kafka: topic={}, key={}, payload={}",
                     topic, message.getKey(), payloadJson);
 
         } catch (JsonProcessingException e) {
-            logger.error("❌ Error serializando evento: {}", event, e);
+            log.error("❌ Error serializando evento: {}", event, e);
             throw new RuntimeException("Error al serializar evento Kafka", e);
         }
     }

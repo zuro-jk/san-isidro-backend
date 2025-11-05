@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>Comprobante de Orden</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            color: #333;
+        }
+        .container {
+            width: 90%;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #f2f2f2;
+            padding-bottom: 10px;
+        }
+        .header h1 {
+            margin: 0;
+            color: #1a1a1a;
+        }
+        .details {
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+        .details p {
+            margin: 5px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f9f9f9;
+        }
+        .total {
+            text-align: right;
+            margin-top: 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 th:text="'Comprobante de Orden #' + ${order.getId()}">
+                Comprobante de Orden #123
+            </h1>
+        </div>
+
+        <div class="details">
+            <p><strong>Cliente:</strong> <span th:text="${order.getCustomer().getUser().getFullName()}">Nombre Cliente</span></p>
+            
+            <p><strong>Fecha:</strong> <span th:text="${#temporals.format(order.getDate(), 'dd/MM/yyyy hh:mm a')}">01/01/2025 10:00 AM</span></p>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>Precio Unitario</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="item : ${order.getDetails()}">
+                    <td th:text="${item.getProduct().getName()}">Producto A</td>
+                    <td th:text="${item.getQuantity()}">1</td>
+                    <td th:text="${#numbers.formatCurrency(item.getUnitPrice())}">S/ 10.00</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="total">
+            <p>Total: <span th:text="${#numbers.formatCurrency(order.getTotal())}">S/ 10.00</span></p>
+        </div>
+    </div>
+</body>
+</html>

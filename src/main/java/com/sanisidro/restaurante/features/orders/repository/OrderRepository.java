@@ -44,4 +44,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Object[]> findOrderTypeStatistics(@Param("lang") String lang);
 
     boolean existsByIdAndCustomer_Id(Long id, Long customerId);
+
+    List<Order> findByType_Code(String typeCode);
+
+    List<Order> findByType_CodeIn(List<String> typeCodes);
 }

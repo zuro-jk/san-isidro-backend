@@ -67,7 +67,7 @@ public class EmailNotificationService implements NotificationHandler<NotifiableE
                 .build();
 
         emailNotificationRepository.save(email);
-        sendWithRetries(email, recipient, emailHtml);
+        sendWithRetries(email, recipient, emailHtml, event);
     }
 
     private User resolveUser(NotifiableEvent event) {
@@ -141,21 +141,35 @@ public class EmailNotificationService implements NotificationHandler<NotifiableE
         };
     }
 
-    private void sendWithRetries(EmailNotification email, String recipient, String emailHtml) {
+    private void sendWithRetries(EmailNotification email, String recipient, String emailHtml, NotifiableEvent event) {
         int attempts = 0;
         boolean sent = false;
 
         while (attempts < 3 && !sent) {
             try {
-                emailService.sendEmail(EmailMessageRequest.builder()
+                var requestBuilder = EmailMessageRequest.builder()
                         .toAddress(recipient)
                         .subject(email.getSubject())
-                        .body(emailHtml)
-                        .build());
+                        .body(emailHtml);
+
+                if (event instanceof OrderNotificationEvent orderEvent &&
+                        orderEvent.getPdfAttachmentBase64() != null &&
+                        !orderEvent.getPdfAttachmentBase64().isBlank()) {
+
+                    log.info("Adjuntando PDF a la notificación de orden...");
+
+                    requestBuilder.pdfAttachmentBase64(orderEvent.getPdfAttachmentBase64());
+                    requestBuilder.attachmentName(orderEvent.getAttachmentName());
+                }
+
+                emailService.sendEmail(requestBuilder.build());
+
                 sent = true;
                 email.setStatus(NotificationStatus.SENT);
                 notificationMetricsService.incrementSent("EMAIL");
+
                 log.info("📧 Notificación enviada a {} en intento #{}", recipient, attempts + 1);
+
             } catch (Exception ex) {
                 attempts++;
                 log.warn("⚠️ Intento #{} fallido para {}: {}", attempts, recipient, ex.getMessage());

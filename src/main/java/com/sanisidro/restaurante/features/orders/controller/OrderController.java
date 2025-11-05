@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
@@ -36,9 +37,11 @@ public class OrderController {
     private final OrderService orderService;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getAll(
-            @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang) {
-        List<OrderResponse> orders = orderService.getAll(lang);
+            @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang,
+            @RequestParam(name = "type", required = false) String typeCode) {
+        List<OrderResponse> orders = orderService.getAll(lang, typeCode);
         return ResponseEntity.ok(new ApiResponse<>(true, "Órdenes obtenidas correctamente", orders));
     }
 
@@ -75,6 +78,17 @@ public class OrderController {
             @AuthenticationPrincipal User user) {
         OrderResponse order = orderService.create(user, request, lang);
         return ResponseEntity.ok(new ApiResponse<>(true, "Orden creada correctamente", order));
+    }
+
+    @PostMapping("/pos/sale")
+    @PreAuthorize("hasAnyRole('ROLE_CASHIER', 'ROLE_ADMIN')")
+    public ResponseEntity<ApiResponse<OrderResponse>> createPosSale(
+            @Valid @RequestBody OrderRequest request,
+            @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang,
+            @AuthenticationPrincipal User cashierUser) {
+
+        OrderResponse order = orderService.createPosSale(cashierUser, request, lang);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Venta POS registrada correctamente", order));
     }
 
     @PostMapping("/{id}/payments/local")
@@ -114,7 +128,7 @@ public class OrderController {
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
     public ResponseEntity<ApiResponse<OrderResponse>> updateStatus(
             @PathVariable Long id,
             @Valid @RequestBody UpdateStatusRequest request,

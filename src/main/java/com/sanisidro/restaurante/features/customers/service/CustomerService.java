@@ -1,9 +1,18 @@
 package com.sanisidro.restaurante.features.customers.service;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.sanisidro.restaurante.core.aws.service.FileService;
 import com.sanisidro.restaurante.core.dto.response.PagedResponse;
 import com.sanisidro.restaurante.core.exceptions.CustomerAlreadyExistsException;
-import com.sanisidro.restaurante.core.exceptions.InvalidPointsOperationException;
 import com.sanisidro.restaurante.core.exceptions.ResourceNotFoundException;
+import com.sanisidro.restaurante.core.security.enums.AuthProvider;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
 import com.sanisidro.restaurante.features.customers.dto.customer.request.CustomerRequest;
@@ -11,17 +20,11 @@ import com.sanisidro.restaurante.features.customers.dto.customer.response.Custom
 import com.sanisidro.restaurante.features.customers.dto.pointshistory.response.PointsHistoryResponse;
 import com.sanisidro.restaurante.features.customers.enums.PointHistoryEventType;
 import com.sanisidro.restaurante.features.customers.model.Customer;
-import com.sanisidro.restaurante.features.customers.model.LoyaltyRule;
 import com.sanisidro.restaurante.features.customers.model.PointsHistory;
 import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -30,10 +33,9 @@ public class CustomerService {
 
     private final CustomerRepository customerRepository;
     private final UserRepository userRepository;
-    private final LoyaltyService loyaltyService;              // Solo cálculo
-    private final PointsHistoryService pointsHistoryService;  // Aplicación de puntos
-
-    /* -------------------- Clientes -------------------- */
+    private final LoyaltyService loyaltyService;
+    private final PointsHistoryService pointsHistoryService;
+    private final FileService fileService;
 
     @Transactional(readOnly = true)
     public PagedResponse<CustomerResponse> getAllCustomers(Pageable pageable) {
@@ -52,10 +54,40 @@ public class CustomerService {
         return mapToResponse(customer);
     }
 
+    @Transactional(readOnly = true)
+    public List<CustomerResponse> searchCustomersByQuery(String query) {
+        log.debug("Buscando clientes con query: {}", query);
+
+        List<Customer> customers = customerRepository.searchByQuery(query.toLowerCase());
+
+        log.debug("Se encontraron {} clientes para la búsqueda: {}", customers.size(), query);
+
+        // 2. Reutiliza tu 'mapToResponse'
+        return customers.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public CustomerResponse createCustomer(CustomerRequest dto) {
-        User user = userRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+        User user;
+
+        if (dto.getUserId() != null) {
+            user = userRepository.findById(dto.getUserId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+        } else {
+            user = User.builder()
+                    .username(dto.getEmail())
+                    .firstName(dto.getFirstName())
+                    .lastName(dto.getLastName())
+                    .email(dto.getEmail())
+                    .phone(dto.getPhone())
+                    .provider(AuthProvider.LOCAL)
+                    .enabled(true)
+                    .emailVerified(true)
+                    .build();
+            userRepository.save(user);
+        }
 
         if (customerRepository.existsByUser_Id(user.getId())) {
             throw new CustomerAlreadyExistsException("El usuario ya tiene un cliente asociado");
@@ -63,13 +95,12 @@ public class CustomerService {
 
         Customer customer = Customer.builder()
                 .user(user)
-                .points(0) // Siempre empezar en 0
+                .points(dto.getPoints() != null ? dto.getPoints() : 0)
                 .build();
 
         Customer saved = customerRepository.save(customer);
         log.info("Cliente creado: {} ({})", saved.getId(), user.getUsername());
 
-        // Aplicar evento inicial "Primer registro"
         int points = loyaltyService.calculatePoints(saved, null, "Primer registro", 1);
         pointsHistoryService.applyPoints(saved, points, PointHistoryEventType.EARNING);
 
@@ -79,11 +110,22 @@ public class CustomerService {
     @Transactional
     public CustomerResponse updateCustomer(Long id, CustomerRequest dto) {
         Customer customer = findCustomerById(id);
+        User user = customer.getUser();
 
-        // Actualización solo de campos permitidos (puntos se maneja solo por PointsHistoryService)
-        Customer updated = customerRepository.save(customer);
-        log.info("Cliente actualizado: {}", updated.getId());
-        return mapToResponse(updated);
+        if (dto.getFirstName() != null)
+            user.setFirstName(dto.getFirstName());
+        if (dto.getLastName() != null)
+            user.setLastName(dto.getLastName());
+        if (dto.getEmail() != null)
+            user.setEmail(dto.getEmail());
+        if (dto.getPhone() != null)
+            user.setPhone(dto.getPhone());
+
+        userRepository.save(user);
+        customerRepository.save(customer);
+
+        log.info("Cliente actualizado: {} ({})", customer.getId(), user.getUsername());
+        return mapToResponse(customer);
     }
 
     @Transactional
@@ -148,6 +190,11 @@ public class CustomerService {
         return buildPagedResponse(page, content);
     }
 
+    @Transactional(readOnly = true)
+    public long countAllCustomers() {
+        return customerRepository.count();
+    }
+
     /* -------------------- Helpers -------------------- */
 
     private Customer findCustomerById(Long id) {
@@ -156,12 +203,34 @@ public class CustomerService {
     }
 
     private CustomerResponse mapToResponse(Customer customer) {
+        User user = customer.getUser();
+
+        String profileImageUrl = null;
+        if (user.getProfileImageId() != null) {
+            profileImageUrl = fileService.getFileUrl(user.getProfileImageId());
+        }
+
         return CustomerResponse.builder()
                 .id(customer.getId())
-                .userId(customer.getUser().getId())
-                .fullName(customer.getUser().getFullName())
-                .email(customer.getUser().getEmail())
+                .userId(user.getId())
+                .username(user.getUsername())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
                 .points(customer.getPoints())
+
+                // Datos extra del usuario
+                .enabled(user.isEnabled())
+                .emailVerified(user.isEmailVerified())
+                .roles(user.getRoles().stream()
+                        .map(r -> r.getName())
+                        .collect(Collectors.toSet()))
+                .provider(user.getProvider().name())
+                .profileImageUrl(profileImageUrl)
+                .lastUsernameChange(user.getLastUsernameChange())
+                .lastEmailChange(user.getLastEmailChange())
                 .build();
     }
 

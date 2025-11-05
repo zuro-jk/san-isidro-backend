@@ -34,7 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 @Profile("dev")
 @RequiredArgsConstructor
 @Slf4j
-@Order(3)
+@Order(4)
 public class EmployeeInitializer implements CommandLineRunner {
 
     private final EmployeeRepository employeeRepository;

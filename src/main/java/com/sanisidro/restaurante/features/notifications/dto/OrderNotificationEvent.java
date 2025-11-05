@@ -17,9 +17,11 @@ public class OrderNotificationEvent implements NotifiableEvent {
     private String subject;
     private String message;
     private String actionUrl;
-
     private Long orderId;
     private List<EmailTemplateBuilder.OrderProduct> products;
     private BigDecimal total;
     private LocalDateTime orderDate;
+
+    private String pdfAttachmentBase64;
+    private String attachmentName;
 }

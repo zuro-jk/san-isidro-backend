@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -23,6 +24,7 @@ import com.sanisidro.restaurante.features.customers.model.Customer;
 import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
 import com.sanisidro.restaurante.features.employees.model.Employee;
 import com.sanisidro.restaurante.features.employees.repository.EmployeeRepository;
+import com.sanisidro.restaurante.features.invoices.service.InvoiceGenerator;
 import com.sanisidro.restaurante.features.notifications.dto.OrderNotificationEvent;
 import com.sanisidro.restaurante.features.notifications.dto.StockLowNotificationEvent;
 import com.sanisidro.restaurante.features.notifications.kafka.NotificationProducer;
@@ -90,9 +92,20 @@ public class OrderService {
         private final TableRepository tableRepository;
         private final StoreRepository storeRepository;
         private final DistanceMatrixService distanceMatrixService;
+        private final InvoiceGenerator invoiceGenerator;
 
-        public List<OrderResponse> getAll(String lang) {
-                return orderRepository.findAll().stream()
+        public List<OrderResponse> getAll(String lang, String typeCode) {
+                List<Order> orders;
+
+                if (typeCode != null && !typeCode.isBlank()) {
+                        log.info("Buscando órdenes filtradas por tipo: {}", typeCode);
+                        orders = orderRepository.findByType_Code(typeCode);
+                } else {
+                        log.info("Buscando todas las órdenes");
+                        orders = orderRepository.findAll();
+                }
+
+                return orders.stream()
                                 .map(order -> mapToResponse(order, lang))
                                 .toList();
         }
@@ -301,6 +314,82 @@ public class OrderService {
         }
 
         @Transactional
+        public OrderResponse createPosSale(User cashierUser, OrderRequest request, String lang) {
+                Employee cashierEmployee = employeeRepository.findByUserId(cashierUser.getId())
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Perfil de empleado no encontrado para el cajero autenticado"));
+
+                if (request.getCustomerId() == null) {
+                        throw new IllegalArgumentException("El customerId es obligatorio para una venta POS.");
+                }
+                Customer customer = customerRepository.findById(request.getCustomerId())
+                                .orElseThrow(() -> new EntityNotFoundException(
+                                                "Cliente no encontrado con id: " + request.getCustomerId()));
+
+                request.setEmployeeId(cashierEmployee.getId());
+
+                Order order = buildOrderBase(request, customer);
+
+                BigDecimal total = BigDecimal.ZERO;
+                Set<OrderDetail> details = new LinkedHashSet<>();
+
+                for (OrderDetailInOrderRequest d : request.getDetails()) {
+                        Product product = productRepository.findById(d.getProductId())
+                                        .orElseThrow(() -> new EntityNotFoundException(
+                                                        "Producto no encontrado con id: " + d.getProductId()));
+
+                        BigDecimal basePrice = product.getPrice();
+                        if (basePrice == null) {
+                                throw new IllegalStateException(
+                                                "El producto con id " + product.getId() + " no tiene precio asignado.");
+                        }
+
+                        BigDecimal taxRate = taxConfig.getRate();
+                        if (taxRate == null) {
+                                throw new IllegalStateException("No está configurada la tasa de impuestos.");
+                        }
+
+                        BigDecimal priceWithTax = basePrice.multiply(BigDecimal.ONE.add(taxRate));
+                        BigDecimal safeQuantity = d.getQuantity() != null ? BigDecimal.valueOf(d.getQuantity())
+                                        : BigDecimal.ZERO;
+
+                        if (safeQuantity.compareTo(BigDecimal.ZERO) <= 0) {
+                                throw new IllegalArgumentException(
+                                                "Cantidad inválida para el producto con id " + d.getProductId());
+                        }
+
+                        BigDecimal lineTotal = priceWithTax.multiply(safeQuantity);
+
+                        log.debug("Calculando línea -> productoId={}, priceWithTax={}, quantity={}, lineTotal={}",
+                                        product.getId(), priceWithTax, safeQuantity, lineTotal);
+
+                        OrderDetail detail = OrderDetail.builder()
+                                        .order(order)
+                                        .product(product)
+                                        .quantity(d.getQuantity())
+                                        .unitPrice(priceWithTax)
+                                        .build();
+
+                        applyInventoryMovement(product, d.getQuantity(), false, order.getId(), "Creación de orden");
+
+                        details.add(detail);
+                        total = total.add(lineTotal);
+                }
+
+                order.setDetails(details);
+                order.setTotal(total);
+
+                Order savedOrder = orderRepository.save(order);
+
+                savePaymentsAndDocuments(order, request);
+
+                Order finalSavedOrder = orderRepository.save(savedOrder);
+
+                publishOrderCreatedEvent(finalSavedOrder);
+                return mapToResponse(finalSavedOrder, lang);
+        }
+
+        @Transactional
         public OrderResponse update(Long id, OrderRequest request, String lang) {
                 Order order = orderRepository.findById(id)
                                 .orElseThrow(() -> new EntityNotFoundException("Orden no encontrada con id: " + id));
@@ -410,16 +499,7 @@ public class OrderService {
                                                 "Empleado (repartidor) no encontrado con id: "
                                                                 + request.getEmployeeId()));
 
-                // Asumiendo que tienes un estado "OUT_FOR_DELIVERY"
-                OrderStatus outForDeliveryStatus = statusRepository.findByCode("OUT_FOR_DELIVERY")
-                                .orElseThrow(() -> new EntityNotFoundException(
-                                                "Estado 'OUT_FOR_DELIVERY' no encontrado"));
-
                 order.setEmployee(driver);
-                order.setStatus(outForDeliveryStatus); // También actualiza el estado
-
-                // Re-calculamos la info de tracking (distancia/duración)
-                // Reusamos la lógica que ya tenías en getTrackingInfo
                 Order savedOrder = orderRepository.save(order);
 
                 // TODO: Enviar notificación al cliente "¡Tu pedido está en camino!"
@@ -427,13 +507,12 @@ public class OrderService {
 
                 log.info("Repartidor {} asignado a la orden {}", driver.getId(), savedOrder.getId());
 
-                // Devolvemos la info actualizada
                 return getTrackingInfo(savedOrder.getId(), lang);
         }
 
         /**
          * Actualiza la ubicación GPS del repartidor para una orden.
-         * La seguridad de ROL_EMPLOYEE fue validada en el controlador.
+         * La seguridad fue validada en el controlador.
          * ¡PERO! Aún debemos validar que el empleado sea el CORRECTO.
          */
         @Transactional
@@ -792,6 +871,9 @@ public class OrderService {
 
         private void publishOrderCreatedEvent(Order savedOrder) {
                 try {
+                        byte[] pdfBytes = invoiceGenerator.generateInvoice(savedOrder);
+                        String pdfBase64 = Base64.getEncoder().encodeToString(pdfBytes);
+
                         OrderCreatedEvent event = OrderCreatedEvent.builder()
                                         .orderId(savedOrder.getId())
                                         .customerId(savedOrder.getCustomer().getId())
@@ -824,6 +906,8 @@ public class OrderService {
                                                         .toList())
                                         .total(event.getTotal())
                                         .orderDate(event.getCreatedAt())
+                                        .pdfAttachmentBase64(pdfBase64)
+                                        .attachmentName("Comprobante_Orden_" + event.getOrderId() + ".pdf")
                                         .build();
 
                         notificationProducer.send("notifications", notification);

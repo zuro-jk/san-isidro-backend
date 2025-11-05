@@ -21,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 @Profile("dev")
 @RequiredArgsConstructor
 @Slf4j
-@Order(7)
+@Order(8)
 public class RestaurantInitializer implements CommandLineRunner {
 
         private final TableRepository tableRepository;

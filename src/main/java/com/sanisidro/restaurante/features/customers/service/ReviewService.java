@@ -49,6 +49,28 @@ public class ReviewService {
                 .collect(Collectors.toList());
     }
 
+    public boolean hasCustomerReviewed(User user, Long orderId, Long productId, Long reservationId) {
+        Customer customer = customerRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado"));
+
+        boolean exists = false;
+
+        if (orderId != null) {
+            exists = reviewRepository.existsByCustomer_IdAndOrder_Id(customer.getId(), orderId);
+        } else if (productId != null) {
+            exists = reviewRepository.existsByCustomer_IdAndProduct_Id(customer.getId(), productId);
+        } else if (reservationId != null) {
+            exists = reviewRepository.existsByCustomer_IdAndReservation_Id(customer.getId(), reservationId);
+        } else {
+            throw new IllegalArgumentException("Debe especificar orderId, productId o reservationId");
+        }
+
+        log.debug("Verificación de reseña: customerId={}, exists={}, orderId={}, productId={}, reservationId={}",
+                customer.getId(), exists, orderId, productId, reservationId);
+
+        return exists;
+    }
+
     public ReviewResponse createReview(ReviewRequest dto, User user) {
         Customer customer = customerRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado para el usuario autenticado"));

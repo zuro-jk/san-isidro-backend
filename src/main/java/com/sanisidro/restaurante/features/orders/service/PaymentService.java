@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.sanisidro.restaurante.core.security.model.PaymentProfile;
+import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.PaymentProfileRepository;
 import com.sanisidro.restaurante.features.orders.dto.payment.request.MercadoPagoCheckoutRequest;
 import com.sanisidro.restaurante.features.orders.dto.payment.request.OnlineCheckoutRequest;
@@ -56,39 +57,45 @@ public class PaymentService {
     @Transactional
     public PaymentResponse createOnlinePayment(OnlineCheckoutRequest request) throws Exception {
 
-        // Logueamos el inicio
         log.info("Iniciando createOnlinePayment para orderId: {}", request.getOrderId());
 
-        // 1. OBTENER LA ORDEN PRIMERO
         Order order = orderRepository.findById(request.getOrderId())
                 .orElseThrow(() -> {
-                    // Logueamos el error antes de lanzar
                     log.warn("Orden no encontrada con id: {}", request.getOrderId());
                     return new EntityNotFoundException("Orden no encontrada con id: " + request.getOrderId());
                 });
 
-        // 2. VALIDAR EL MONTO DE LA ORDEN (DE LA DB), NO DEL REQUEST
-        // ¡¡ESTE ES EL CAMBIO IMPORTANTE!!
+        if (order.getType() == null) {
+            throw new IllegalArgumentException("El tipo de orden es nulo.");
+        }
+
+        String orderTypeCode = order.getType().getCode().toUpperCase();
+
+        if (!"DELIVERY".equals(orderTypeCode) && !"TAKE_AWAY".equals(orderTypeCode)) {
+            log.warn(
+                    "Intento de pago online RECHAZADO para una orden que no es 'DELIVERY' o 'TAKE_AWAY'. Order ID: {}, Type: {}",
+                    order.getId(), orderTypeCode);
+
+            throw new IllegalArgumentException(
+                    "Los pagos online no están permitidos para este tipo de orden (" + orderTypeCode + ").");
+        }
+
         if (order.getTotal() == null || order.getTotal().compareTo(BigDecimal.ZERO) <= 0) {
             log.warn("Intento de pago para orden {} con monto inválido (nulo o <= 0): {}",
                     order.getId(), order.getTotal());
-            // Lanza una excepción que el controlador pueda atrapar
             throw new IllegalArgumentException("El monto a pagar (calculado en la orden) debe ser mayor que cero.");
         }
 
-        // Log para ver la diferencia entre el monto del request y el de la orden
         log.info("Monto recibido (request): {}. Monto a procesar (order.getTotal): {}",
                 request.getTransactionAmount(), order.getTotal());
 
-        // 3. OBTENER MÉTODO DE PAGO
         PaymentMethod method = paymentMethodRepository.findByCodeAndProvider("CARD", "MERCADOPAGO")
                 .orElseThrow(() -> {
                     log.error("Método de pago no configurado para provider: MERCADOPAGO, code: CARD");
                     return new EntityNotFoundException("Método de pago no configurado para provider: MERCADOPAGO");
                 });
 
-        // 4. LÓGICA DE PERFIL DE PAGO (PaymentProfile)
-        var user = order.getCustomer().getUser();
+        User user = order.getCustomer().getUser();
         PaymentProfile paymentProfile = user.getPaymentProfile();
         if (paymentProfile == null) {
             log.info("Creando nuevo PaymentProfile para usuario: {}", user.getId());
@@ -101,17 +108,12 @@ public class PaymentService {
             paymentProfileRepository.save(paymentProfile);
         }
 
-        // 5. INTENTAR EL PAGO CON MERCADOPAGO
-        // Ya no usamos try-catch aquí, dejamos que las excepciones suban al Controller
-
-        // 5.1. Mapear request (usando el método privado corregido)
         MercadoPagoCheckoutRequest mpRequest = mapToMercadoPagoRequest(order, request, paymentProfile);
 
         log.info("Enviando solicitud de pago a MercadoPago por monto: {}", mpRequest.getTransactionAmount());
-        var mpPayment = mercadoPagoService.createPayment(mpRequest); // <-- Esto puede lanzar MPApiException
+        var mpPayment = mercadoPagoService.createPayment(mpRequest);
         log.info("Respuesta de MercadoPago recibida. Status: {}", mpPayment.getStatus());
 
-        // 5.2. Interpretar respuesta
         PaymentStatus status = switch (mpPayment.getStatus()) {
             case "approved" -> PaymentStatus.CONFIRMED;
             case "in_process", "pending" -> PaymentStatus.PENDING;
@@ -119,11 +121,10 @@ public class PaymentService {
             default -> PaymentStatus.PENDING;
         };
 
-        // 6. GUARDAR EL PAGO EN DB
         Payment payment = Payment.builder()
                 .order(order)
                 .paymentMethod(method)
-                .amount(order.getTotal()) // <-- Usar el monto de la orden
+                .amount(order.getTotal())
                 .isOnline(true)
                 .transactionCode(String.valueOf(mpPayment.getId()))
                 .status(status)
@@ -133,19 +134,21 @@ public class PaymentService {
         Payment savedPayment = paymentRepository.save(payment);
         log.info("Pago guardado en DB con ID: {}", savedPayment.getId());
 
-        // 7. ACTUALIZAR ESTADO DE LA ORDEN SI EL PAGO FUE CONFIRMADO
         if (status == PaymentStatus.CONFIRMED) {
             log.info("Pago confirmado. Actualizando estado de la orden {} a CONFIRMED", order.getId());
             OrderStatus confirmedStatus = orderStatusRepository.findByCode("CONFIRMED")
-                    .orElseThrow(() -> {
-                        log.error("Estado de orden 'CONFIRMED' no encontrado en la base de datos.");
-                        return new EntityNotFoundException("Estado CONFIRMED no encontrado");
-                    });
+                    .orElseThrow(() -> new EntityNotFoundException("Estado CONFIRMED no encontrado"));
             order.setStatus(confirmedStatus);
+            orderRepository.save(order);
+        } else {
+            log.warn("Pago online no aprobado (estado: {}). Moviendo orden {} a PENDING_CONFIRMATION para revisión.",
+                    mpPayment.getStatus(), order.getId());
+            OrderStatus pendingConfirmStatus = orderStatusRepository.findByCode("PENDING_CONFIRMATION")
+                    .orElseThrow(() -> new EntityNotFoundException("Estado PENDING_CONFIRMATION no encontrado"));
+            order.setStatus(pendingConfirmStatus);
             orderRepository.save(order);
         }
 
-        // 8. RETORNAR RESPUESTA
         return mapToResponse(savedPayment);
     }
 

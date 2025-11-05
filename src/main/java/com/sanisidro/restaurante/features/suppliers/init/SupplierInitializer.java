@@ -26,7 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 @Profile("dev")
 @RequiredArgsConstructor
 @Slf4j
-@Order(5)
+@Order(6)
 public class SupplierInitializer implements CommandLineRunner {
 
     private final SupplierRepository supplierRepository;

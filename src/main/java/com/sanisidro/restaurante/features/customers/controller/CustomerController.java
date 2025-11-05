@@ -1,8 +1,11 @@
 package com.sanisidro.restaurante.features.customers.controller;
 
+import java.util.List;
+
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -53,6 +56,17 @@ public class CustomerController {
             @PathVariable Long id, Pageable pageable) {
         PagedResponse<PointsHistoryResponse> history = customerService.getPointsHistory(id, pageable);
         return ResponseEntity.ok(new ApiResponse<>(true, "Historial de puntos obtenido correctamente", history));
+    }
+
+    @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
+    public ResponseEntity<ApiResponse<List<CustomerResponse>>> searchCustomers(
+            @RequestParam("query") String query) {
+
+        List<CustomerResponse> customers = customerService.searchCustomersByQuery(query);
+
+        return ResponseEntity.ok(
+                new ApiResponse<>(true, "Clientes encontrados", customers));
     }
 
     @PostMapping

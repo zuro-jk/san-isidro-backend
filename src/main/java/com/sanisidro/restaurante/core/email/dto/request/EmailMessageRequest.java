@@ -2,7 +2,11 @@ package com.sanisidro.restaurante.core.email.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Getter
 @Setter
@@ -20,4 +24,7 @@ public class EmailMessageRequest {
 
     @NotBlank(message = "El cuerpo no puede estar vacio")
     private String body;
+
+    private String pdfAttachmentBase64;
+    private String attachmentName;
 }

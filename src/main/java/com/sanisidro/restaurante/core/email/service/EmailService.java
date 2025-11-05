@@ -1,21 +1,25 @@
 package com.sanisidro.restaurante.core.email.service;
 
-import com.sanisidro.restaurante.core.email.dto.request.EmailMessageRequest;
-import com.sanisidro.restaurante.core.email.dto.resposne.EmailMessageResponse;
-import com.sanisidro.restaurante.core.email.model.EmailLog;
-import com.sanisidro.restaurante.core.email.repository.EmailLogRepository;
-import jakarta.annotation.PostConstruct;
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.time.LocalDateTime;
+import java.util.Base64;
+
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import com.sanisidro.restaurante.core.email.dto.request.EmailMessageRequest;
+import com.sanisidro.restaurante.core.email.dto.resposne.EmailMessageResponse;
+import com.sanisidro.restaurante.core.email.model.EmailLog;
+import com.sanisidro.restaurante.core.email.repository.EmailLogRepository;
+
+import jakarta.annotation.PostConstruct;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
@@ -41,8 +45,7 @@ public class EmailService {
         log.info("   → Asunto: {}", request.getSubject());
 
         var previous = emailLogRepository.findFirstByToAddressAndSubjectOrderBySentAtDesc(
-                request.getToAddress(), request.getSubject()
-        );
+                request.getToAddress(), request.getSubject());
 
         if (previous.isPresent() && "SENT".equals(previous.get().getStatus())) {
             return EmailMessageResponse.builder()
@@ -64,13 +67,21 @@ public class EmailService {
             log.info("   → Remitente usado (from): {}", senderEmail);
             log.info("   → Destinatario (to): {}", request.getToAddress());
 
-
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
+
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            
             helper.setFrom(senderEmail);
             helper.setTo(request.getToAddress());
             helper.setSubject(request.getSubject());
             helper.setText(request.getBody(), true);
+
+            if (request.getPdfAttachmentBase64() != null) {
+                byte[] pdfBytes = Base64.getDecoder().decode(request.getPdfAttachmentBase64());
+                helper.addAttachment(
+                        request.getAttachmentName() != null ? request.getAttachmentName() : "comprobante.pdf",
+                        new ByteArrayResource(pdfBytes));
+            }
 
             mailSender.send(message);
 
