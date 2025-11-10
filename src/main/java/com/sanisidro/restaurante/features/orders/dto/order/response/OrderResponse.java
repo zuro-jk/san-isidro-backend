@@ -45,7 +45,9 @@ public class OrderResponse {
     private LocalDateTime date;
 
     private Long statusId;
+    private String statusCode;
     private String statusName;
+
     private Long typeId;
     private String typeName;
 

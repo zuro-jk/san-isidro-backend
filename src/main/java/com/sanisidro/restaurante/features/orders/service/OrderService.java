@@ -735,6 +735,11 @@ public class OrderService {
                                 }
 
                                 orderBuilder.table(selectedTable);
+
+                                selectedTable.setStatus(TableStatus.OCCUPIED);
+                                tableRepository.save(selectedTable);
+                                log.info("Mesa {} marcada como OCUPADA por nueva orden.", selectedTable.getCode());
+                                
                                 break;
 
                         case "TAKE_AWAY":
@@ -829,6 +834,7 @@ public class OrderService {
                                                 : null)
                                 .date(order.getDate())
                                 .statusId(order.getStatus().getId())
+                                .statusCode(order.getStatus().getCode())
                                 .statusName(getStatusName(order.getStatus(), lang))
                                 .typeId(order.getType().getId())
                                 .typeName(getTypeName(order.getType(), lang))

@@ -1,26 +1,31 @@
 package com.sanisidro.restaurante.features.restaurant.service;
 
-import com.sanisidro.restaurante.core.config.ReservationProperties;
-import com.sanisidro.restaurante.features.customers.model.Reservation;
-import com.sanisidro.restaurante.features.customers.repository.ReservationRepository;
-import com.sanisidro.restaurante.features.restaurant.dto.table.request.TableRequest;
-import com.sanisidro.restaurante.features.restaurant.dto.table.response.TableAvailabilityResponse;
-import com.sanisidro.restaurante.features.restaurant.dto.table.response.TableResponse;
-import com.sanisidro.restaurante.features.restaurant.enums.TableStatus;
-import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
-import com.sanisidro.restaurante.features.restaurant.repository.TableRepository;
-import jakarta.persistence.EntityNotFoundException;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+
+import com.sanisidro.restaurante.core.config.ReservationProperties;
+import com.sanisidro.restaurante.features.customers.model.Reservation;
+import com.sanisidro.restaurante.features.customers.repository.ReservationRepository;
+import com.sanisidro.restaurante.features.orders.model.Order;
+import com.sanisidro.restaurante.features.orders.repository.OrderRepository;
+import com.sanisidro.restaurante.features.restaurant.dto.table.request.TableRequest;
+import com.sanisidro.restaurante.features.restaurant.dto.table.response.TableAvailabilityResponse;
+import com.sanisidro.restaurante.features.restaurant.dto.table.response.TableResponse;
+import com.sanisidro.restaurante.features.restaurant.enums.TableStatus;
+import com.sanisidro.restaurante.features.restaurant.model.TableEntity;
+import com.sanisidro.restaurante.features.restaurant.repository.TableRepository;
+
+import jakarta.persistence.EntityNotFoundException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
@@ -30,26 +35,38 @@ public class TableService {
     private final TableRepository tableRepository;
     private final ReservationProperties reservationProperties;
     private final ReservationRepository reservationRepository;
-
+    private final OrderRepository orderRepository;
 
     public List<TableResponse> getAllTables() {
-        return tableRepository.findAll()
-                .stream()
-                .map(this::mapToResponse)
+        List<TableEntity> tables = tableRepository.findAll();
+
+        List<String> activeStatuses = List.of("PENDING", "PREPARING", "IN_PROGRESS", "READY_FOR_PICKUP", "PAID");
+        List<Order> activeOrders = orderRepository.findActiveOrdersByType(activeStatuses, "DINE_IN");
+
+        Map<Long, Long> activeOrderMap = activeOrders.stream()
+                .filter(order -> order.getTable() != null)
+                .collect(Collectors.toMap(
+                        order -> order.getTable().getId(),
+                        Order::getId,
+                        (existing, replacement) -> existing));
+
+        return tables.stream()
+                .map(table -> mapToResponse(table, activeOrderMap.get(table.getId())))
                 .collect(Collectors.toList());
     }
 
     public TableResponse getTableById(Long id) {
         TableEntity table = tableRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Mesa no encontrada con id: " + id));
-        return mapToResponse(table);
+        return mapToResponse(table, null);
     }
 
     public TableResponse createTable(TableRequest request) {
         validateTableRequest(request);
         TableEntity table = mapToEntity(request);
         table.setStatus(TableStatus.FREE);
-        return mapToResponse(tableRepository.save(table));
+        TableEntity savedTable = tableRepository.save(table);
+        return mapToResponse(savedTable, null);
     }
 
     public TableResponse updateTable(Long id, TableRequest request) {
@@ -70,8 +87,9 @@ public class TableService {
         table.setBufferBeforeMinutes(request.getBufferBeforeMinutes());
         table.setBufferAfterMinutes(request.getBufferAfterMinutes());
         table.setStatus(request.getStatus());
+        TableEntity updatedTable = tableRepository.save(table);
 
-        return mapToResponse(tableRepository.save(table));
+        return mapToResponse(updatedTable, null);
     }
 
     public void deleteTable(Long id) {
@@ -86,14 +104,17 @@ public class TableService {
         TableEntity table = tableRepository.findById(tableId)
                 .orElseThrow(() -> new EntityNotFoundException("Mesa no encontrada con id: " + tableId));
 
-        if (!table.canAccommodate(numberOfPeople)) return false;
+        if (!table.canAccommodate(numberOfPeople))
+            return false;
 
         LocalDateTime start = LocalDateTime.parse(startTime);
         LocalDateTime end = start.plusMinutes(table.getReservationDurationMinutes());
 
         if (includeBuffers) {
-            int before = table.getBufferBeforeMinutes() != null ? table.getBufferBeforeMinutes() : reservationProperties.getBufferBeforeMinutes();
-            int after = table.getBufferAfterMinutes() != null ? table.getBufferAfterMinutes() : reservationProperties.getBufferAfterMinutes();
+            int before = table.getBufferBeforeMinutes() != null ? table.getBufferBeforeMinutes()
+                    : reservationProperties.getBufferBeforeMinutes();
+            int after = table.getBufferAfterMinutes() != null ? table.getBufferAfterMinutes()
+                    : reservationProperties.getBufferAfterMinutes();
 
             start = start.minusMinutes(before);
             end = end.plusMinutes(after);
@@ -116,7 +137,7 @@ public class TableService {
                 .stream()
                 .filter(t -> t.canAccommodate(numberOfPeople))
                 .filter(t -> isTableAvailable(t.getId(), startTime, numberOfPeople, true))
-                .map(this::mapToResponse)
+                .map(table -> mapToResponse(table, null))
                 .collect(Collectors.toList());
     }
 
@@ -126,11 +147,13 @@ public class TableService {
                 .filter(t -> t.canAccommodate(numberOfPeople))
                 .filter(t -> isTableAvailable(t.getId(), startTime, numberOfPeople, true))
                 .min(Comparator.comparingInt(t -> t.getOptimalCapacity()))
-                .map(this::mapToResponse)
-                .orElseThrow(() -> new EntityNotFoundException("No hay mesas disponibles para este horario y número de personas"));
+                .map(table -> mapToResponse(table, null))
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "No hay mesas disponibles para este horario y número de personas"));
     }
 
-    public List<TableAvailabilityResponse> getTablesWithAvailableTimes(int numberOfPeople, LocalDateTime date, boolean filterByCapacity) {
+    public List<TableAvailabilityResponse> getTablesWithAvailableTimes(int numberOfPeople, LocalDateTime date,
+            boolean filterByCapacity) {
         List<TableAvailabilityResponse> results = new ArrayList<>();
 
         for (TableEntity table : tableRepository.findAll()) {
@@ -164,19 +187,23 @@ public class TableService {
         LocalDateTime endOfDay = LocalDateTime.of(date.toLocalDate(), table.getCloseTime());
         int incrementMinutes = 30;
 
-        int bufferBefore = table.getBufferBeforeMinutes() != null ? table.getBufferBeforeMinutes() : reservationProperties.getBufferBeforeMinutes();
-        int bufferAfter = table.getBufferAfterMinutes() != null ? table.getBufferAfterMinutes() : reservationProperties.getBufferAfterMinutes();
+        int bufferBefore = table.getBufferBeforeMinutes() != null ? table.getBufferBeforeMinutes()
+                : reservationProperties.getBufferBeforeMinutes();
+        int bufferAfter = table.getBufferAfterMinutes() != null ? table.getBufferAfterMinutes()
+                : reservationProperties.getBufferAfterMinutes();
 
         while (!start.plusMinutes(table.getReservationDurationMinutes()).isAfter(endOfDay)) {
             LocalDateTime slotStart = start.minusMinutes(bufferBefore);
             LocalDateTime slotEnd = start.plusMinutes(table.getReservationDurationMinutes() + bufferAfter);
 
-            if (slotStart.toLocalTime().isBefore(table.getOpenTime()) || slotEnd.toLocalTime().isAfter(table.getCloseTime())) {
+            if (slotStart.toLocalTime().isBefore(table.getOpenTime())
+                    || slotEnd.toLocalTime().isAfter(table.getCloseTime())) {
                 start = start.plusMinutes(incrementMinutes);
                 continue;
             }
 
-            List<Reservation> overlapping = reservationRepository.findOverlappingReservations(table.getId(), slotStart, slotEnd);
+            List<Reservation> overlapping = reservationRepository.findOverlappingReservations(table.getId(), slotStart,
+                    slotEnd);
 
             if (overlapping.isEmpty()) {
                 times.add(start.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")));
@@ -190,8 +217,8 @@ public class TableService {
 
     /* -------------------- UTILIDADES -------------------- */
 
-    private TableResponse mapToResponse(TableEntity table) {
-        return TableResponse.builder()
+    private TableResponse mapToResponse(TableEntity table, Long activeOrderId) {
+        TableResponse response = TableResponse.builder()
                 .id(table.getId())
                 .code(table.getCode())
                 .alias(table.getAlias())
@@ -206,7 +233,18 @@ public class TableService {
                 .bufferBeforeMinutes(table.getBufferBeforeMinutes())
                 .bufferAfterMinutes(table.getBufferAfterMinutes())
                 .status(table.getStatus())
+                // No seteamos activeOrderId aquí
                 .build();
+
+        if (activeOrderId != null) {
+            response.setActiveOrderId(activeOrderId);
+            if (response.getStatus() == TableStatus.FREE) {
+                response.setStatus(TableStatus.OCCUPIED);
+            }
+        } else if (table.getStatus() == TableStatus.OCCUPIED) {
+        }
+
+        return response;
     }
 
     private TableEntity mapToEntity(TableRequest request) {
@@ -234,7 +272,8 @@ public class TableService {
         if (request.getOptimalCapacity() > request.getCapacity()) {
             throw new IllegalArgumentException("La capacidad óptima no puede ser mayor que la capacidad máxima");
         }
-        if (request.getOpenTime().isAfter(request.getCloseTime()) || request.getOpenTime().equals(request.getCloseTime())) {
+        if (request.getOpenTime().isAfter(request.getCloseTime())
+                || request.getOpenTime().equals(request.getCloseTime())) {
             throw new IllegalArgumentException("La hora de apertura debe ser anterior a la hora de cierre");
         }
         if (request.getReservationDurationMinutes() <= 0) {

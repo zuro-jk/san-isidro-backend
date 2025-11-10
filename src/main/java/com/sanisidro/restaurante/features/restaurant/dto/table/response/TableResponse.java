@@ -25,4 +25,6 @@ public class TableResponse {
     private Integer bufferBeforeMinutes;
     private Integer bufferAfterMinutes;
     private TableStatus status;
+
+    private Long activeOrderId;
 }
