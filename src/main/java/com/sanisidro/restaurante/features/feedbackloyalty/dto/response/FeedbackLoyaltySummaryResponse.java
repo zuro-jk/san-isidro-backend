@@ -3,6 +3,7 @@ package com.sanisidro.restaurante.features.feedbackloyalty.dto.response;
 import java.util.List;
 
 import com.sanisidro.restaurante.features.customers.dto.review.response.ReviewResponse;
+import com.sanisidro.restaurante.features.feedbackloyalty.dto.reward.response.RewardResponse;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,8 +15,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class FeedbackLoyaltySummaryResponse {
-    private List<ReviewResponse> recentReviews; 
-    private double averageRating; 
+    private List<ReviewResponse> recentReviews;
+    private double averageRating;
 
     private long totalRegisteredCustomers;
     private int totalPointsAccumulated;

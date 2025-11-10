@@ -27,4 +27,16 @@ public class ProductResponse {
     private Integer preparationTimeMinutes;
     private List<ProductIngredientResponse> ingredients;
     private boolean active;
+
+    private boolean isCombo;
+    private List<ComboItemResponseStub> comboItems;
+
+    @Getter
+    @Setter
+    @Builder
+    public static class ComboItemResponseStub {
+        private Long simpleProductId;
+        private String simpleProductName;
+        private int quantity;
+    }
 }

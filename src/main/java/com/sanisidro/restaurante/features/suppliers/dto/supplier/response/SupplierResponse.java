@@ -11,5 +11,7 @@ public class SupplierResponse {
     private String contactName;
     private String phone;
     private String address;
+    private String username;
+    private String email;
     private Long userId;
 }

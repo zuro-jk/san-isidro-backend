@@ -63,8 +63,22 @@ public class Product {
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
+    @Column(name = "is_combo", nullable = false)
+    private boolean isCombo = false;
+
+    @OneToMany(mappedBy = "comboProduct", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<ComboProductItem> comboItems = new LinkedHashSet<>();
+
     public void replaceIngredients(Set<ProductIngredient> newIngredients) {
         ingredients.clear();
         ingredients.addAll(newIngredients);
+    }
+
+    public void replaceComboItems(Set<ComboProductItem> newComboItems) {
+        comboItems.clear();
+        if (newComboItems != null) {
+            comboItems.addAll(newComboItems);
+        }
     }
 }

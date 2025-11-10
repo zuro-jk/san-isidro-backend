@@ -1,6 +1,7 @@
 package com.sanisidro.restaurante.core.security.service;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -17,9 +18,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.sanisidro.restaurante.core.aws.model.FileMetadata;
 import com.sanisidro.restaurante.core.aws.service.FileService;
+import com.sanisidro.restaurante.core.exceptions.EmailAlreadyExistsException;
 import com.sanisidro.restaurante.core.exceptions.EmailChangeNotAllowedException;
 import com.sanisidro.restaurante.core.exceptions.InvalidPasswordException;
 import com.sanisidro.restaurante.core.exceptions.UserNotFoundException;
+import com.sanisidro.restaurante.core.exceptions.UsernameAlreadyExistsException;
 import com.sanisidro.restaurante.core.exceptions.UsernameChangeNotAllowedException;
 import com.sanisidro.restaurante.core.security.dto.ChanguePasswordRequest;
 import com.sanisidro.restaurante.core.security.dto.UpdateProfileRequest;
@@ -112,6 +115,33 @@ public class UserService {
                 .profileImageUrl(
                         user.getProfileImageId() != null ? fileService.getFileUrl(user.getProfileImageId()) : null)
                 .build();
+    }
+
+    @Transactional
+    public User createNewUser(String username, String email, String password,
+            String firstName, String lastName, String phone) {
+
+        if (userRepository.existsByUsername(username)) {
+            throw new UsernameAlreadyExistsException("Username ya existe");
+        }
+        if (userRepository.existsByEmailIgnoreCase(email)) {
+            throw new EmailAlreadyExistsException("Email ya existe");
+        }
+
+        User user = User.builder()
+                .username(username)
+                .email(email)
+                .password(passwordEncoder.encode(password))
+                .firstName(firstName)
+                .lastName(lastName)
+                .phone(phone)
+                .roles(new HashSet<>())
+                .enabled(true)
+                .emailVerified(true)
+                .provider(AuthProvider.LOCAL)
+                .build();
+
+        return userRepository.save(user);
     }
 
     @Transactional

@@ -1,6 +1,5 @@
 package com.sanisidro.restaurante.core.security.controller;
 
-import com.sanisidro.restaurante.core.security.dto.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -10,6 +9,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sanisidro.restaurante.core.exceptions.InvalidVerificationCodeException;
+import com.sanisidro.restaurante.core.security.dto.ApiResponse;
+import com.sanisidro.restaurante.core.security.dto.AuthResponse;
+import com.sanisidro.restaurante.core.security.dto.LoginRequest;
+import com.sanisidro.restaurante.core.security.dto.RefreshRequest;
+import com.sanisidro.restaurante.core.security.dto.RegisterRequest;
+import com.sanisidro.restaurante.core.security.dto.SessionLogoutRequest;
 import com.sanisidro.restaurante.core.security.service.AuthService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -81,7 +86,6 @@ public class AuthController {
 
         return ResponseEntity.ok(new ApiResponse<>(true, "Logout exitoso", null));
     }
-
 
     @PostMapping("/logout-all")
     public ResponseEntity<ApiResponse<Object>> logoutAll(HttpServletRequest httpRequest) {

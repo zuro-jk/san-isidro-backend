@@ -1,11 +1,7 @@
 package com.sanisidro.restaurante.core.config;
 
-import com.sanisidro.restaurante.core.security.handler.OAuth2FailureHandler;
-import com.sanisidro.restaurante.core.security.handler.OAuth2SuccessHandler;
-import com.sanisidro.restaurante.core.security.jwt.JwtAuthFilter;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.util.List;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -22,7 +18,13 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 
-import java.util.List;
+import com.sanisidro.restaurante.core.security.handler.OAuth2FailureHandler;
+import com.sanisidro.restaurante.core.security.handler.OAuth2SuccessHandler;
+import com.sanisidro.restaurante.core.security.jwt.JwtAuthFilter;
+
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Configuration
 @EnableWebSecurity
@@ -55,39 +57,57 @@ public class SecurityConfig {
                         .requestMatchers("/oauth2/**").permitAll()
                         .requestMatchers("/loginSuccess").permitAll()
                         .requestMatchers("/api/v1/notification/**").permitAll()
-
                         .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/products/**").hasAnyRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/products/**").hasAnyRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/products/**").hasAnyRole("ADMIN")
-
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/categories/**").hasAnyRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/categories/**").hasAnyRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/categories/**").hasAnyRole("ADMIN")
 
-                        .requestMatchers("/api/v1/users/**").hasAnyRole("CLIENT", "ADMIN")
-                        .requestMatchers("/api/v1/reservations/**").hasAnyRole("CLIENT", "ADMIN")
-                        .requestMatchers("/api/v1/customers/**").hasAnyRole("CLIENT", "ADMIN")
-                        .requestMatchers("/api/v1/addresses/**").hasAnyRole("CLIENT", "ADMIN")
-                        .requestMatchers("/api/v1/reservations/**").hasAnyRole("CLIENT", "WAITER", "ADMIN")
-                        .requestMatchers("/api/v1/reviews/**").hasAnyRole("CLIENT", "ADMIN")
-                        .requestMatchers("/api/v1/orders/**").hasAnyRole("CLIENT", "WAITER", "CHEF", "CASHIER", "ADMIN")
-                        .requestMatchers("/api/v1/inventory/**").hasAnyRole("ADMIN", "CHEF")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/products/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/products/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/products/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/categories/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/categories/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/categories/**").hasAnyRole("ADMIN", "MANAGER")
+
+                        .requestMatchers("/api/v1/inventory/**").hasAnyRole("ADMIN", "CHEF", "MANAGER")
+                        .requestMatchers("/api/v1/reviews/**").hasAnyRole("CLIENT", "ADMIN", "MANAGER")
+
+                        .requestMatchers("/api/v1/staff/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers("/api/v1/suppliers/**").hasAnyRole("ADMIN", "MANAGER")
+
+                        .requestMatchers(HttpMethod.GET, "/api/v1/promotions/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/promotions/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/promotions/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/promotions/**").hasAnyRole("ADMIN", "MANAGER")
+
+                        .requestMatchers("/api/v1/loyalty-management/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers("/api/v1/feedback-and-loyalty/**").hasAnyRole("ADMIN", "MANAGER")
+
+                        .requestMatchers("/api/v1/reports/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers("/api/v1/delivery/**").hasAnyRole("ADMIN", "MANAGER")
+
+                        .requestMatchers("/api/v1/users/**")
+                        .hasAnyRole("CLIENT", "ADMIN", "WAITER", "CASHIER", "MANAGER")
+                        .requestMatchers("/api/v1/customers/**")
+                        .hasAnyRole("CLIENT", "ADMIN", "WAITER", "CASHIER", "MANAGER")
+                        .requestMatchers("/api/v1/addresses/**")
+                        .hasAnyRole("CLIENT", "ADMIN", "WAITER", "CASHIER", "MANAGER")
+
+                        .requestMatchers("/api/v1/reservations/**").hasAnyRole("CLIENT", "WAITER", "ADMIN", "MANAGER")
+                        .requestMatchers("/api/v1/orders/**")
+                        .hasAnyRole("CLIENT", "WAITER", "CHEF", "CASHIER", "ADMIN", "MANAGER")
+
                         .requestMatchers("/api/v1/stores/**").hasAnyRole("CLIENT", "ADMIN")
-                        .anyRequest().authenticated()
-                )
+
+                        .anyRequest()
+                        .authenticated())
                 .oauth2Login(oauth2 -> oauth2
                         .successHandler(oAuth2SuccessHandler)
-                        .failureHandler(oAuth2FailureHandler)
-                )
+                        .failureHandler(oAuth2FailureHandler))
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setContentType("application/json");
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.getWriter().write("{\"error\": \"Unauthorized\"}");
-                        })
-                )
+                        }))
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
@@ -102,9 +122,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration config) throws Exception {
+    public AuthenticationManager authenticationManager(
+            org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration config)
+            throws Exception {
         return config.getAuthenticationManager();
     }
 }
-
-

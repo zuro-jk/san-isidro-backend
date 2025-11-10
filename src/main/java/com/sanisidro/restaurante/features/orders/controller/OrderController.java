@@ -2,6 +2,9 @@ package com.sanisidro.restaurante.features.orders.controller;
 
 import java.util.List;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -37,7 +40,7 @@ public class OrderController {
     private final OrderService orderService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_WAITER', 'ROLE_CHEF', 'ROLE_CASHIER')")
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getAll(
             @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang,
             @RequestParam(name = "type", required = false) String typeCode) {
@@ -46,6 +49,7 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<OrderResponse>> getById(
             @PathVariable Long id,
             @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang) {
@@ -54,6 +58,7 @@ public class OrderController {
     }
 
     @GetMapping("/{id}/tracking")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<OrderResponse>> trackOrder(
             @PathVariable Long id,
             @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang) {
@@ -63,6 +68,7 @@ public class OrderController {
     }
 
     @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()") // <-- CAMBIO: Más explícito
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getMyOrders(
             @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang,
             @AuthenticationPrincipal User user) {
@@ -71,7 +77,26 @@ public class OrderController {
                 .ok(new ApiResponse<>(true, "Órdenes del usuario autenticado obtenidas correctamente", orders));
     }
 
+    @GetMapping("/{id}/download-invoice")
+    // <-- CAMBIO: El Manager también puede descargar
+    @PreAuthorize("hasAnyRole('ROLE_CASHIER', 'ROLE_ADMIN', 'ROLE_MANAGER')")
+
+    public ResponseEntity<byte[]> downloadInvoice(@PathVariable Long id) {
+
+        byte[] pdfBytes = orderService.generateInvoiceForOrder(id);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        String filename = "Comprobante-Orden-" + id + ".pdf";
+
+        headers.setContentDispositionFormData("inline", filename);
+        headers.setContentLength(pdfBytes.length);
+
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+    }
+
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<OrderResponse>> create(
             @Valid @RequestBody OrderRequest request,
             @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang,
@@ -81,7 +106,7 @@ public class OrderController {
     }
 
     @PostMapping("/pos/sale")
-    @PreAuthorize("hasAnyRole('ROLE_CASHIER', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('ROLE_CASHIER', 'ROLE_ADMIN', 'ROLE_WAITER', 'ROLE_MANAGER')")
     public ResponseEntity<ApiResponse<OrderResponse>> createPosSale(
             @Valid @RequestBody OrderRequest request,
             @RequestHeader(name = "Accept-Language", defaultValue = "es") String lang,
@@ -92,6 +117,7 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/payments/local")
+    @PreAuthorize("hasAnyRole('ROLE_CASHIER', 'ROLE_ADMIN', 'ROLE_MANAGER')")
     public ResponseEntity<ApiResponse<Void>> addLocalPayment(
             @PathVariable Long id,
             @Valid @RequestBody PaymentInOrderRequest request) {
@@ -100,7 +126,7 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/location")
-    @PreAuthorize("hasRole('ROLE_EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ROLE_WAITER', 'ROLE_MANAGER', 'ROLE_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> updateLocation(
             @PathVariable Long id,
             @Valid @RequestBody UpdateLocationRequest request,
@@ -110,6 +136,7 @@ public class OrderController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_WAITER', 'ROLE_CASHIER', 'ROLE_CHEF')")
     public ResponseEntity<ApiResponse<OrderResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody OrderRequest request,
@@ -119,6 +146,7 @@ public class OrderController {
     }
 
     @PutMapping("/{id}/cancel")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<OrderResponse>> cancelOrder(
             @PathVariable Long id,
             @AuthenticationPrincipal User user,
@@ -128,7 +156,7 @@ public class OrderController {
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_WAITER', 'ROLE_CHEF', 'ROLE_CASHIER')")
     public ResponseEntity<ApiResponse<OrderResponse>> updateStatus(
             @PathVariable Long id,
             @Valid @RequestBody UpdateStatusRequest request,
@@ -139,7 +167,7 @@ public class OrderController {
     }
 
     @PutMapping("/{id}/assign-driver")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_MANAGER')")
     public ResponseEntity<ApiResponse<OrderResponse>> assignDriver(
             @PathVariable Long id,
             @Valid @RequestBody AssignDriverRequest request,
@@ -150,9 +178,10 @@ public class OrderController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_MANAGER')")
+
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         orderService.delete(id);
         return ResponseEntity.ok(new ApiResponse<>(true, "Orden eliminada correctamente", null));
     }
-
 }

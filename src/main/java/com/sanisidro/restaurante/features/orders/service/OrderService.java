@@ -381,7 +381,7 @@ public class OrderService {
 
                 Order savedOrder = orderRepository.save(order);
 
-                savePaymentsAndDocuments(order, request);
+                savePaymentsAndDocuments(savedOrder, request);
 
                 Order finalSavedOrder = orderRepository.save(savedOrder);
 
@@ -617,6 +617,21 @@ public class OrderService {
 
                 paymentService.createInOrder(order, request);
                 orderRepository.save(order);
+        }
+
+        @Transactional(readOnly = true)
+        public byte[] generateInvoiceForOrder(Long id) {
+
+                Order order = orderRepository.findById(id)
+                                .orElseThrow(() -> new EntityNotFoundException("Orden no encontrada con id: " + id));
+
+                byte[] pdfBytes = invoiceGenerator.generateInvoice(order);
+
+                if (pdfBytes == null || pdfBytes.length == 0) {
+                        throw new RuntimeException("Error al generar PDF: el archivo está vacío.");
+                }
+
+                return pdfBytes;
         }
 
         private Order buildOrderBase(OrderRequest request, Customer customer) {

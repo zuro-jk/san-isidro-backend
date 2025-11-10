@@ -5,6 +5,7 @@ import java.util.Set;
 
 import com.sanisidro.restaurante.core.model.Auditable;
 import com.sanisidro.restaurante.core.security.model.User;
+import com.sanisidro.restaurante.features.feedbackloyalty.models.PointsHistory;
 
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.CascadeType;

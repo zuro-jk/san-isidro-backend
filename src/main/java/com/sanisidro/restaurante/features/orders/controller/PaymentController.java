@@ -1,7 +1,9 @@
 package com.sanisidro.restaurante.features.orders.controller;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
@@ -30,9 +33,15 @@ public class PaymentController {
         private final PaymentService paymentService;
 
         @GetMapping
-        public ResponseEntity<ApiResponse<List<PaymentResponse>>> getAll() {
+        public ResponseEntity<ApiResponse<List<PaymentResponse>>> getAll(
+                        @RequestParam(required = false) Long customerId,
+                        @RequestParam(required = false) Long paymentMethodId,
+                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,
+                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo) {
+                List<PaymentResponse> payments = paymentService.getAll(
+                                customerId, paymentMethodId, dateFrom, dateTo);
                 return ResponseEntity.ok(
-                                new ApiResponse<>(true, "Lista de pagos", paymentService.getAll()));
+                                new ApiResponse<>(true, "Lista de pagos", payments));
         }
 
         @GetMapping("/{id}")

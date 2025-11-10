@@ -20,6 +20,8 @@ public class InvoiceGenerator {
 
     private final TemplateEngine templateEngine;
 
+    
+
     public byte[] generateInvoice(Order order) {
 
         Locale peruLocale = new Locale("es", "PE");

@@ -47,6 +47,7 @@ import com.sanisidro.restaurante.core.security.repository.UserRepository;
 import com.sanisidro.restaurante.features.customers.dto.customer.request.CustomerRequest;
 import com.sanisidro.restaurante.features.customers.service.CustomerService;
 import com.sanisidro.restaurante.features.employees.errors.OutOfScheduleAccessException;
+import com.sanisidro.restaurante.features.employees.model.Employee;
 import com.sanisidro.restaurante.features.employees.repository.EmployeeRepository;
 import com.sanisidro.restaurante.features.employees.service.ScheduleService;
 import com.sanisidro.restaurante.features.notifications.dto.EmailVerificationEvent;
@@ -54,9 +55,11 @@ import com.sanisidro.restaurante.features.notifications.kafka.NotificationProduc
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthService {
 
     @Value("${app.jwt.refresh-token-expiration}")
@@ -119,13 +122,32 @@ public class AuthService {
             boolean esAdmin = user.hasRole("ROLE_ADMIN");
             boolean esCliente = user.hasRole("ROLE_CLIENT");
 
+            log.info("Iniciando login para: {}. Es Admin: {}. Es Cliente: {}", user.getUsername(), esAdmin, esCliente);
+
             if (!esAdmin && !esCliente) {
-                employeeRepository.findByUserId(user.getId()).ifPresent(employee -> {
+                log.info("Usuario {} es un empleado. Verificando horario...", user.getUsername());
+
+                var employeeOpt = employeeRepository.findByUserId(user.getId());
+
+                if (employeeOpt.isPresent()) {
+                    Employee employee = employeeOpt.get();
+                    log.info("Verificando horario para Employee ID: {}", employee.getId());
+
                     boolean dentroDeHorario = scheduleService.isWithinSchedule(employee);
+
+                    log.info("Resultado de isWithinSchedule: {}", dentroDeHorario);
+
                     if (!dentroDeHorario) {
+                        log.warn("Acceso denegado para {}. Razón: Fuera de horario.", user.getUsername());
                         throw new OutOfScheduleAccessException("No puedes iniciar sesión fuera de tu horario laboral");
                     }
-                });
+
+                    log.info("Acceso permitido para {}. Está dentro de horario.", user.getUsername());
+
+                } else {
+                    log.warn("Usuario {} tiene roles de empleado pero no existe una entidad 'Employee' asociada.",
+                            user.getUsername());
+                }
             }
 
             RefreshToken refreshToken = createRefreshToken(user, clientIp, userAgent);
@@ -147,9 +169,13 @@ public class AuthService {
             UserProfileResponse profile = buildUserProfileResponse(user);
 
             return new AuthResponse(accessToken, refreshToken.getId().toString(), profile);
+        } catch (OutOfScheduleAccessException e) {
+            throw e;
         } catch (SecurityException e) {
+            log.error("SecurityException durante el login de {}", key, e);
             throw new OutOfScheduleAccessException("No puedes iniciar sesión fuera de tu horario laboral");
         } catch (Exception ex) {
+            log.error("Excepción genérica durante el login de {}", key, ex);
             trackFailedLogin(key, clientIp);
             throw new InvalidCredentialsException("Credenciales inválidas");
         }

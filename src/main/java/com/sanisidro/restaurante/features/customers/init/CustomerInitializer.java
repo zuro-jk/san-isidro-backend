@@ -11,9 +11,9 @@ import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
 import com.sanisidro.restaurante.features.customers.enums.LoyaltyRuleType;
 import com.sanisidro.restaurante.features.customers.model.Customer;
-import com.sanisidro.restaurante.features.customers.model.LoyaltyRule;
 import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
-import com.sanisidro.restaurante.features.customers.repository.LoyaltyRuleRepository;
+import com.sanisidro.restaurante.features.feedbackloyalty.models.LoyaltyRule;
+import com.sanisidro.restaurante.features.feedbackloyalty.repository.LoyaltyRuleRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

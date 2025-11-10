@@ -34,6 +34,8 @@ import com.sanisidro.restaurante.features.customers.model.Customer;
 import com.sanisidro.restaurante.features.customers.model.Reservation;
 import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
 import com.sanisidro.restaurante.features.customers.repository.ReservationRepository;
+import com.sanisidro.restaurante.features.feedbackloyalty.service.LoyaltyService;
+import com.sanisidro.restaurante.features.feedbackloyalty.service.PointsHistoryService;
 import com.sanisidro.restaurante.features.notifications.dto.ReservationNotificationEvent;
 import com.sanisidro.restaurante.features.notifications.kafka.NotificationProducer;
 import com.sanisidro.restaurante.features.restaurant.enums.TableStatus;

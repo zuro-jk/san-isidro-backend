@@ -14,6 +14,7 @@ public class PaymentResponse {
     private Long orderId;
     private Long paymentMethodId;
     private String paymentMethodName;
+    private String customerName;
     private BigDecimal amount;
     private LocalDateTime date;
     private Boolean isOnline;

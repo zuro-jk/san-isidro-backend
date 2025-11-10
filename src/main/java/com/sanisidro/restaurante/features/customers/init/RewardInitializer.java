@@ -7,8 +7,8 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-import com.sanisidro.restaurante.features.customers.model.Reward;
-import com.sanisidro.restaurante.features.customers.repository.RewardRepository;
+import com.sanisidro.restaurante.features.feedbackloyalty.models.Reward;
+import com.sanisidro.restaurante.features.feedbackloyalty.repository.RewardRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -20,8 +20,8 @@ import com.sanisidro.restaurante.core.dto.response.PagedResponse;
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
 import com.sanisidro.restaurante.features.customers.dto.customer.request.CustomerRequest;
 import com.sanisidro.restaurante.features.customers.dto.customer.response.CustomerResponse;
-import com.sanisidro.restaurante.features.customers.dto.pointshistory.response.PointsHistoryResponse;
 import com.sanisidro.restaurante.features.customers.service.CustomerService;
+import com.sanisidro.restaurante.features.feedbackloyalty.dto.pointshistory.response.PointsHistoryResponse;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -59,7 +59,7 @@ public class CustomerController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_WAITER', 'ROLE_CASHIER')")
     public ResponseEntity<ApiResponse<List<CustomerResponse>>> searchCustomers(
             @RequestParam("query") String query) {
 

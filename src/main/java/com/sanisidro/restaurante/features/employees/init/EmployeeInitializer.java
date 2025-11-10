@@ -37,148 +37,160 @@ import lombok.extern.slf4j.Slf4j;
 @Order(4)
 public class EmployeeInitializer implements CommandLineRunner {
 
-    private final EmployeeRepository employeeRepository;
-    private final PositionRepository positionRepository;
-    private final ScheduleRepository scheduleRepository;
-    private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
+        private final EmployeeRepository employeeRepository;
+        private final PositionRepository positionRepository;
+        private final ScheduleRepository scheduleRepository;
+        private final UserRepository userRepository;
+        private final RoleRepository roleRepository;
 
-    @Override
-    @Transactional
-    public void run(String... args) throws Exception {
-        Map<String, Position> positions = initPositions();
-        if (positions != null) {
-            initEmployeesAndSchedules(positions);
+        // --- ¡¡¡LA CORRECCIÓN!!! ---
+        private static final LocalTime END_OF_DAY = LocalTime.of(23, 59, 59);
+
+        @Override
+        @Transactional
+        public void run(String... args) throws Exception {
+                log.warn("******************************************************");
+                log.warn("*** EJECUTANDO EmployeeInitializer (Modo DEV)      ***");
+                log.warn("******************************************************");
+
+                Map<String, Position> positions = initPositions();
+                if (positions != null) {
+                        initEmployeesAndSchedules(positions);
+                }
         }
-    }
 
-    private Map<String, Position> initPositions() {
-        if (positionRepository.count() > 0) {
-            log.info(">>> Posiciones ya inicializadas.");
-            return positionRepository.findAll().stream()
-                    .collect(Collectors.toMap(Position::getName, p -> p));
+        private Map<String, Position> initPositions() {
+                // ... (este método está bien, no se necesita cambiar) ...
+                if (positionRepository.count() > 0) {
+                        log.info(">>> Posiciones ya inicializadas.");
+                        return positionRepository.findAll().stream()
+                                        .collect(Collectors.toMap(Position::getName, p -> p));
+                }
+                log.info(">>> Inicializando Posiciones...");
+                Role adminRole = roleRepository.findByName("ROLE_ADMIN")
+                                .orElseThrow(() -> new IllegalStateException("ROLE_ADMIN no encontrado"));
+                Role managerRole = roleRepository.findByName("ROLE_MANAGER")
+                                .orElseThrow(() -> new IllegalStateException("ROLE_MANAGER no encontrado"));
+                Role waiterRole = roleRepository.findByName("ROLE_WAITER")
+                                .orElseThrow(() -> new IllegalStateException("ROLE_WAITER no encontrado"));
+                Role chefRole = roleRepository.findByName("ROLE_CHEF")
+                                .orElseThrow(() -> new IllegalStateException("ROLE_CHEF no encontrado"));
+                Role cashierRole = roleRepository.findByName("ROLE_CASHIER")
+                                .orElseThrow(() -> new IllegalStateException("ROLE_CASHIER no encontrado"));
+
+                Map<String, Position> positionsMap = Map.of(
+                                "ADMIN",
+                                Position.builder().name("ADMIN").description("Administrador general")
+                                                .roles(Set.of(adminRole)).build(),
+                                "MANAGER",
+                                Position.builder().name("MANAGER").description("Gerente del restaurante")
+                                                // --- AQUÍ ESTÁ EL CAMBIO ---
+                                                .roles(Set.of(cashierRole, waiterRole, managerRole))
+                                                .build(),
+                                "WAITER",
+                                Position.builder().name("WAITER").description("Mesero").roles(Set.of(waiterRole))
+                                                .build(),
+                                "CHEF",
+                                Position.builder().name("CHEF").description("Cocinero").roles(Set.of(chefRole)).build(),
+                                "CASHIER", Position.builder().name("CASHIER").description("Cajero")
+                                                .roles(Set.of(cashierRole)).build());
+
+                positionRepository.saveAll(positionsMap.values());
+                log.info(">>> Posiciones inicializadas correctamente.");
+                return positionsMap;
         }
-        log.info(">>> Inicializando Posiciones...");
-        Role adminRole = roleRepository.findByName("ROLE_ADMIN")
-                .orElseThrow(() -> new IllegalStateException("ROLE_ADMIN no encontrado"));
-        Role waiterRole = roleRepository.findByName("ROLE_WAITER")
-                .orElseThrow(() -> new IllegalStateException("ROLE_WAITER no encontrado"));
-        Role chefRole = roleRepository.findByName("ROLE_CHEF")
-                .orElseThrow(() -> new IllegalStateException("ROLE_CHEF no encontrado"));
-        Role cashierRole = roleRepository.findByName("ROLE_CASHIER")
-                .orElseThrow(() -> new IllegalStateException("ROLE_CASHIER no encontrado"));
 
-        Map<String, Position> positionsMap = Map.of(
-                "ADMIN",
-                Position.builder().name("ADMIN").description("Administrador general").roles(Set.of(adminRole)).build(),
-                "MANAGER",
-                Position.builder().name("MANAGER").description("Gerente del restaurante")
-                        .roles(Set.of(adminRole, cashierRole)).build(), // Asumiendo que manager también puede ser admin
-                "WAITER", Position.builder().name("WAITER").description("Mesero").roles(Set.of(waiterRole)).build(),
-                "CHEF", Position.builder().name("CHEF").description("Cocinero").roles(Set.of(chefRole)).build(),
-                "CASHIER", Position.builder().name("CASHIER").description("Cajero").roles(Set.of(cashierRole)).build());
+        private void initEmployeesAndSchedules(Map<String, Position> positions) {
+                log.info(">>> Sincronizando Empleados y Horarios (Modo DEV)...");
 
-        positionRepository.saveAll(positionsMap.values());
-        log.info(">>> Posiciones inicializadas correctamente.");
-        return positionsMap;
-    }
+                Employee adminEmployee = findAndCreateEmployee("admin", positions.get("ADMIN"),
+                                BigDecimal.valueOf(5000), LocalDate.now().minusMonths(6));
+                Employee managerEmployee = findAndCreateEmployee("jose_m", positions.get("MANAGER"),
+                                BigDecimal.valueOf(4000), LocalDate.now().minusMonths(3));
+                Employee waiterEmployee = findAndCreateEmployee("maria_w", positions.get("WAITER"),
+                                BigDecimal.valueOf(2000), LocalDate.now().minusMonths(1));
+                Employee chefEmployee = findAndCreateEmployee("carlos_c", positions.get("CHEF"),
+                                BigDecimal.valueOf(3000), LocalDate.now().minusMonths(2));
+                log.info(">>> Entidades Employee creadas o verificadas.");
 
-    private void initEmployeesAndSchedules(Map<String, Position> positions) {
-        if (employeeRepository.count() > 0) {
-            log.info(">>> Empleados (Users y Employees) ya inicializados.");
-            return;
+                log.info(">>> [IMPORTANTE] Borrando TODOS los horarios antiguos de la BD...");
+                scheduleRepository.deleteAll();
+                scheduleRepository.flush();
+
+                log.info(">>> Creando horarios nuevos con la hora de fin: {}", END_OF_DAY);
+
+                // AHORA SE USA END_OF_DAY (23:59:59) EN LUGAR DE LocalTime.MAX
+                scheduleRepository.saveAll(List.of(
+                                // Admin
+                                Schedule.builder().employee(adminEmployee).dayOfWeek(DayOfWeekEnum.MONDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(adminEmployee).dayOfWeek(DayOfWeekEnum.TUESDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(adminEmployee).dayOfWeek(DayOfWeekEnum.WEDNESDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(adminEmployee).dayOfWeek(DayOfWeekEnum.THURSDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(adminEmployee).dayOfWeek(DayOfWeekEnum.FRIDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+
+                                // Manager (jose_m)
+                                Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.MONDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.TUESDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.WEDNESDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.THURSDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.FRIDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.SATURDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                // Waiter (maria_w) - Lunes a Viernes
+                                Schedule.builder().employee(waiterEmployee).dayOfWeek(DayOfWeekEnum.MONDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(waiterEmployee).dayOfWeek(DayOfWeekEnum.TUESDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(waiterEmployee).dayOfWeek(DayOfWeekEnum.WEDNESDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(waiterEmployee).dayOfWeek(DayOfWeekEnum.THURSDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(waiterEmployee).dayOfWeek(DayOfWeekEnum.FRIDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+
+                                // Chef (carlos_c) - Lunes a Viernes
+                                Schedule.builder().employee(chefEmployee).dayOfWeek(DayOfWeekEnum.MONDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(chefEmployee).dayOfWeek(DayOfWeekEnum.TUESDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(chefEmployee).dayOfWeek(DayOfWeekEnum.WEDNESDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(chefEmployee).dayOfWeek(DayOfWeekEnum.THURSDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build(),
+                                Schedule.builder().employee(chefEmployee).dayOfWeek(DayOfWeekEnum.FRIDAY)
+                                                .startTime(LocalTime.of(12, 0)).endTime(END_OF_DAY).build()));
+                log.info(">>> Horarios de empleados sincronizados correctamente.");
         }
-        log.info(">>> Creando Usuarios, Empleados y Horarios...");
 
-        User adminUser = findUserAndSyncRoles("admin", positions.get("ADMIN"));
-        User managerUser = findUserAndSyncRoles("jose_m", positions.get("MANAGER"));
-        User waiterUser = findUserAndSyncRoles("maria_w", positions.get("WAITER"));
-        User chefUser = findUserAndSyncRoles("carlos_c", positions.get("CHEF"));
+        private Employee findAndCreateEmployee(String username, Position position, BigDecimal salary,
+                        LocalDate hireDate) {
+                // ... (este método está bien, no se necesita cambiar) ...
+                User user = userRepository.findByUsername(username)
+                                .orElseThrow(() -> new IllegalStateException("Usuario base para empleado '" + username
+                                                + "' no encontrado. Asegúrate de que SecurityInitializer (Order 1) se ejecute primero."));
+                user.syncRolesWithPosition(position);
+                userRepository.save(user);
 
-        Employee adminEmployee = createEmployeeIfNotExists(adminUser, positions.get("ADMIN"), BigDecimal.valueOf(5000),
-                LocalDate.now().minusMonths(6));
-        Employee managerEmployee = createEmployeeIfNotExists(managerUser, positions.get("MANAGER"),
-                BigDecimal.valueOf(4000), LocalDate.now().minusMonths(3));
-        Employee waiterEmployee = createEmployeeIfNotExists(waiterUser, positions.get("WAITER"),
-                BigDecimal.valueOf(2000), LocalDate.now().minusMonths(1));
-        Employee chefEmployee = createEmployeeIfNotExists(chefUser, positions.get("CHEF"), BigDecimal.valueOf(3000),
-                LocalDate.now().minusMonths(2));
-        log.info(">>> Entidades Employee creadas o verificadas.");
-
-        if (scheduleRepository.count() > 0) {
-            log.info(">>> Horarios ya inicializados.");
-        } else {
-            log.info(">>> Creando Horarios...");
-            scheduleRepository.saveAll(List.of(
-                    Schedule.builder().employee(adminEmployee).dayOfWeek(DayOfWeekEnum.MONDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
-                    Schedule.builder().employee(adminEmployee).dayOfWeek(DayOfWeekEnum.TUESDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(), // Admin trabaja L-V
-                    Schedule.builder().employee(adminEmployee).dayOfWeek(DayOfWeekEnum.WEDNESDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
-                    Schedule.builder().employee(adminEmployee).dayOfWeek(DayOfWeekEnum.THURSDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
-                    Schedule.builder().employee(adminEmployee).dayOfWeek(DayOfWeekEnum.FRIDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
-
-                    Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.MONDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
-                    Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.TUESDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(), // Manager L-S
-                    Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.WEDNESDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
-                    Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.THURSDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
-                    Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.FRIDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
-                    Schedule.builder().employee(managerEmployee).dayOfWeek(DayOfWeekEnum.SATURDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
-
-                    Schedule.builder().employee(waiterEmployee).dayOfWeek(DayOfWeekEnum.WEDNESDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(), // Mesero Miér-Dom
-                    Schedule.builder().employee(waiterEmployee).dayOfWeek(DayOfWeekEnum.THURSDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
-                    Schedule.builder().employee(waiterEmployee).dayOfWeek(DayOfWeekEnum.FRIDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(), // Turno noche
-                    Schedule.builder().employee(waiterEmployee).dayOfWeek(DayOfWeekEnum.SATURDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
-                    Schedule.builder().employee(waiterEmployee).dayOfWeek(DayOfWeekEnum.SUNDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
-
-                    Schedule.builder().employee(chefEmployee).dayOfWeek(DayOfWeekEnum.TUESDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(), // Chef Mar-Sáb
-                    Schedule.builder().employee(chefEmployee).dayOfWeek(DayOfWeekEnum.WEDNESDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
-                    Schedule.builder().employee(chefEmployee).dayOfWeek(DayOfWeekEnum.THURSDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
-                    Schedule.builder().employee(chefEmployee).dayOfWeek(DayOfWeekEnum.FRIDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build(),
-                    Schedule.builder().employee(chefEmployee).dayOfWeek(DayOfWeekEnum.SATURDAY)
-                            .startTime(LocalTime.of(12, 0)).endTime(LocalTime.MIDNIGHT).build()));
-            log.info(">>> Horarios inicializados correctamente.");
+                return employeeRepository.findByUserId(user.getId()).orElseGet(() -> {
+                        log.debug("Creando entidad Employee para usuario: {}", user.getUsername());
+                        Employee newEmployee = Employee.builder()
+                                        .user(user)
+                                        .position(position)
+                                        .salary(salary)
+                                        .hireDate(hireDate)
+                                        .status(EmploymentStatus.ACTIVE)
+                                        .build();
+                        return employeeRepository.save(newEmployee);
+                });
         }
-    }
-
-    private User findUserAndSyncRoles(String username, Position position) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalStateException("Usuario base para empleado '" + username
-                        + "' no encontrado. Asegúrate de que SecurityInitializer se ejecute primero."));
-        user.syncRolesWithPosition(position);
-        return userRepository.save(user);
-    }
-
-    private Employee createEmployeeIfNotExists(User user, Position position, BigDecimal salary, LocalDate hireDate) {
-        return employeeRepository.findByUserId(user.getId()).orElseGet(() -> {
-            log.debug("Creando entidad Employee para usuario: {}", user.getUsername());
-            Employee newEmployee = Employee.builder()
-                    .user(user)
-                    .position(position)
-                    .salary(salary)
-                    .hireDate(hireDate)
-                    .status(EmploymentStatus.ACTIVE)
-                    .build();
-            return employeeRepository.save(newEmployee);
-        });
-    }
-
 }

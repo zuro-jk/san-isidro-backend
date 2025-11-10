@@ -3,6 +3,7 @@ package com.sanisidro.restaurante.features.products.dto.product.request;
 import java.math.BigDecimal;
 import java.util.List;
 
+import com.sanisidro.restaurante.features.products.dto.comboproductitem.request.ComboItemRequest;
 import com.sanisidro.restaurante.features.products.dto.productingredient.request.ProductIngredientRequest;
 
 import jakarta.validation.Valid;
@@ -43,6 +44,10 @@ public class ProductRequest {
 
     private Boolean active;
 
+    private boolean isCombo;
+
     @Valid
     private List<ProductIngredientRequest> ingredients;
+
+    private List<ComboItemRequest> comboItems;
 }

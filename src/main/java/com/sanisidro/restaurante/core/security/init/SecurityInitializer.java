@@ -47,7 +47,8 @@ public class SecurityInitializer implements CommandLineRunner {
             return;
         }
         log.info(">>> Inicializando Roles...");
-        String[] roles = { "ROLE_CLIENT", "ROLE_WAITER", "ROLE_CHEF", "ROLE_CASHIER", "ROLE_ADMIN", "ROLE_SUPPLIER" };
+        String[] roles = { "ROLE_CLIENT", "ROLE_WAITER", "ROLE_CHEF", "ROLE_CASHIER", "ROLE_ADMIN", "ROLE_SUPPLIER",
+                "ROLE_MANAGER" };
         for (String roleName : roles) {
             roleRepository.findByName(roleName)
                     .orElseGet(() -> roleRepository.save(new Role(null, roleName)));

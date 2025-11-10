@@ -18,6 +18,7 @@ import com.sanisidro.restaurante.core.aws.exception.AccessDeniedException;
 import com.sanisidro.restaurante.core.aws.exception.FileNotFoundException;
 import com.sanisidro.restaurante.core.aws.exception.FileUploadException;
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
+import com.sanisidro.restaurante.features.employees.errors.OutOfScheduleAccessException;
 import com.sanisidro.restaurante.features.products.exceptions.CategoryNotFoundException;
 import com.sanisidro.restaurante.features.products.exceptions.DuplicateProductException;
 import com.sanisidro.restaurante.features.products.exceptions.IngredientNotFoundException;
@@ -178,6 +179,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(EmailChangeNotAllowedException.class)
     public ResponseEntity<ApiResponse<Object>> handleEmailChangeNotAllowed(EmailChangeNotAllowedException ex) {
         return buildResponse(ex.getMessage(), HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiResponse<Object>> handleInvalidCredentials(InvalidCredentialsException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(OutOfScheduleAccessException.class)
+    public ResponseEntity<ApiResponse<Object>> handleOutOfScheduleAccess(OutOfScheduleAccessException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.FORBIDDEN);
     }
 
 }

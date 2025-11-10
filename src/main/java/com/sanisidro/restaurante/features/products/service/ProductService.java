@@ -18,6 +18,7 @@ import com.sanisidro.restaurante.features.products.dto.productingredient.respons
 import com.sanisidro.restaurante.features.products.exceptions.CategoryNotFoundException;
 import com.sanisidro.restaurante.features.products.exceptions.ProductNotFoundException;
 import com.sanisidro.restaurante.features.products.model.Category;
+import com.sanisidro.restaurante.features.products.model.ComboProductItem;
 import com.sanisidro.restaurante.features.products.model.Ingredient;
 import com.sanisidro.restaurante.features.products.model.Product;
 import com.sanisidro.restaurante.features.products.model.ProductIngredient;
@@ -114,6 +115,7 @@ public class ProductService {
                                 .imageUrl(request.getImageUrl())
                                 .preparationTimeMinutes(request.getPreparationTimeMinutes())
                                 .active(request.getActive() != null ? request.getActive() : true)
+                                .isCombo(request.isCombo())
                                 .build();
 
                 if (request.getIngredients() != null && !request.getIngredients().isEmpty()) {
@@ -136,6 +138,32 @@ public class ProductService {
                         product.replaceIngredients(ingredients);
                 }
 
+                if (request.isCombo() && request.getComboItems() != null && !request.getComboItems().isEmpty()) {
+                        log.info("Añadiendo productos al combo...");
+                        Set<ComboProductItem> comboItems = request.getComboItems().stream()
+                                        .map(comboReq -> {
+                                                Product simpleProduct = productRepository
+                                                                .findById(comboReq.getSimpleProductId())
+                                                                .orElseThrow(() -> new ProductNotFoundException(
+                                                                                "Producto (item) no encontrado con id: "
+                                                                                                + comboReq.getSimpleProductId()));
+
+                                                if (simpleProduct.isCombo()) {
+                                                        throw new IllegalArgumentException(
+                                                                        "No se puede añadir un combo dentro de otro combo.");
+                                                }
+
+                                                return ComboProductItem.builder()
+                                                                .comboProduct(product)
+                                                                .simpleProduct(simpleProduct)
+                                                                .quantity(comboReq.getQuantity())
+                                                                .build();
+                                        })
+                                        .collect(Collectors.toSet());
+
+                        product.setComboItems(comboItems);
+                }
+
                 Product saved = productRepository.save(product);
                 return mapToResponse(saved);
         }
@@ -147,22 +175,18 @@ public class ProductService {
                                                 "Producto no encontrado con id: " + id));
 
                 String previousImageUrl = product.getImageUrl();
-
                 if (request.getName() != null && !request.getName().isBlank()) {
                         product.setName(request.getName());
                 }
-
                 if (request.getPrice() != null && request.getPrice().compareTo(BigDecimal.ZERO) >= 0) {
                         product.setPrice(request.getPrice());
                 }
-
                 if (request.getCategoryId() != null) {
                         Category category = categoryRepository.findById(request.getCategoryId())
                                         .orElseThrow(() -> new CategoryNotFoundException(
                                                         "Categoría no encontrada con id: " + request.getCategoryId()));
                         product.setCategory(category);
                 }
-
                 if (request.getImageUrl() == null || request.getImageUrl().isBlank()) {
                         if (previousImageUrl != null && !previousImageUrl.isBlank()) {
                                 fileService.deleteFileByUrl(previousImageUrl);
@@ -174,36 +198,68 @@ public class ProductService {
                         }
                         product.setImageUrl(request.getImageUrl());
                 }
-
                 if (request.getActive() != null) {
                         product.setActive(request.getActive());
                 }
-
                 if (request.getPreparationTimeMinutes() != null && request.getPreparationTimeMinutes() > 0) {
                         product.setPreparationTimeMinutes(request.getPreparationTimeMinutes());
                 }
 
-                if (request.getIngredients() != null) {
-                        Set<ProductIngredient> ingredients = request.getIngredients().stream()
-                                        .map(ingReq -> {
-                                                Ingredient ingredient = ingredientRepository
-                                                                .findById(ingReq.getIngredientId())
-                                                                .orElseThrow(() -> new EntityNotFoundException(
-                                                                                "Ingrediente no encontrado con id: "
-                                                                                                + ingReq.getIngredientId()));
+                product.setCombo(request.isCombo());
 
-                                                return ProductIngredient.builder()
-                                                                .product(product)
-                                                                .ingredient(ingredient)
-                                                                .quantity(ingReq.getQuantity())
-                                                                .build();
-                                        })
-                                        .collect(Collectors.toSet());
+                if (request.isCombo()) {
+                        log.info("Actualizando como Combo...");
+                        product.replaceIngredients(null);
 
+                        Set<ComboProductItem> comboItems = null;
+                        if (request.getComboItems() != null) {
+                                comboItems = request.getComboItems().stream()
+                                                .map(comboReq -> {
+                                                        Product simpleProduct = productRepository
+                                                                        .findById(comboReq.getSimpleProductId())
+                                                                        .orElseThrow(() -> new ProductNotFoundException(
+                                                                                        "Producto (item) no encontrado con id: "
+                                                                                                        + comboReq.getSimpleProductId()));
+                                                        if (simpleProduct.isCombo()) {
+                                                                throw new IllegalArgumentException(
+                                                                                "No se puede añadir un combo dentro de otro combo.");
+                                                        }
+                                                        return ComboProductItem.builder()
+                                                                        .comboProduct(product)
+                                                                        .simpleProduct(simpleProduct)
+                                                                        .quantity(comboReq.getQuantity())
+                                                                        .build();
+                                                })
+                                                .collect(Collectors.toSet());
+                        }
+                        product.replaceComboItems(comboItems);
+
+                } else {
+                        log.info("Actualizando como Producto Simple...");
+                        product.replaceComboItems(null); 
+
+                        Set<ProductIngredient> ingredients = null;
+                        if (request.getIngredients() != null) {
+                                ingredients = request.getIngredients().stream()
+                                                .map(ingReq -> {
+                                                        Ingredient ingredient = ingredientRepository
+                                                                        .findById(ingReq.getIngredientId())
+                                                                        .orElseThrow(() -> new EntityNotFoundException(
+                                                                                        "Ingrediente no encontrado con id: "
+                                                                                                        + ingReq.getIngredientId()));
+                                                        return ProductIngredient.builder()
+                                                                        .product(product)
+                                                                        .ingredient(ingredient)
+                                                                        .quantity(ingReq.getQuantity())
+                                                                        .build();
+                                                })
+                                                .collect(Collectors.toSet());
+                        }
                         product.replaceIngredients(ingredients);
                 }
 
                 Product updated = productRepository.save(product);
+                log.info("Producto guardado: {} - esCombo: {}", updated.getName(), updated.isCombo());
                 return mapToResponse(updated);
         }
 
@@ -259,6 +315,7 @@ public class ProductService {
         }
 
         private ProductResponse mapToResponse(Product product) {
+
                 List<ProductIngredientResponse> ingredientResponses = product.getIngredients() == null
                                 ? List.of()
                                 : product.getIngredients().stream()
@@ -268,6 +325,16 @@ public class ProductService {
                                                                 .unitName(pi.getIngredient().getUnit().getName())
                                                                 .unitSymbol(pi.getIngredient().getUnit().getSymbol())
                                                                 .quantity(pi.getQuantity())
+                                                                .build())
+                                                .toList();
+
+                List<ProductResponse.ComboItemResponseStub> comboItemResponses = product.getComboItems() == null
+                                ? List.of()
+                                : product.getComboItems().stream()
+                                                .map(ci -> ProductResponse.ComboItemResponseStub.builder()
+                                                                .simpleProductId(ci.getSimpleProduct().getId())
+                                                                .simpleProductName(ci.getSimpleProduct().getName())
+                                                                .quantity(ci.getQuantity())
                                                                 .build())
                                                 .toList();
 
@@ -282,7 +349,8 @@ public class ProductService {
                                 .preparationTimeMinutes(product.getPreparationTimeMinutes())
                                 .ingredients(ingredientResponses)
                                 .active(product.isActive())
+                                .isCombo(product.isCombo())
+                                .comboItems(comboItemResponses)
                                 .build();
         }
-
 }

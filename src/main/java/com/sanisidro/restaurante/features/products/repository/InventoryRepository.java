@@ -22,4 +22,15 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
                 ORDER BY i.currentStock ASC
             """)
     List<Inventory> findLowStockInventories();
+
+    /**
+     * Obtiene una vista completa del inventario actual,
+     * uniendo Ingrediente y Unidad para un reporte completo.
+     */
+    @Query("SELECT i.ingredient.id, i.ingredient.name, i.ingredient.unit.name, i.currentStock, i.minimumStock " +
+            "FROM Inventory i " +
+            "JOIN i.ingredient " +
+            "JOIN i.ingredient.unit " +
+            "ORDER BY i.ingredient.name ASC")
+    List<Object[]> findInventoryReport();
 }

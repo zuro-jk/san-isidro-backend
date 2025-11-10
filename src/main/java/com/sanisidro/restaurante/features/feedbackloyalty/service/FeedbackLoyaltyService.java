@@ -6,11 +6,10 @@ import org.springframework.stereotype.Service;
 
 import com.sanisidro.restaurante.features.customers.dto.review.response.ReviewResponse;
 import com.sanisidro.restaurante.features.customers.service.CustomerService;
-import com.sanisidro.restaurante.features.customers.service.LoyaltyService;
 import com.sanisidro.restaurante.features.customers.service.ReviewService;
 import com.sanisidro.restaurante.features.feedbackloyalty.dto.response.FeedbackLoyaltySummaryResponse;
 import com.sanisidro.restaurante.features.feedbackloyalty.dto.response.LoyalCustomerResponse;
-import com.sanisidro.restaurante.features.feedbackloyalty.dto.response.RewardResponse;
+import com.sanisidro.restaurante.features.feedbackloyalty.dto.reward.response.RewardResponse;
 
 import lombok.RequiredArgsConstructor;
 
@@ -21,6 +20,7 @@ public class FeedbackLoyaltyService {
     private final ReviewService reviewService;
     private final CustomerService customerService;
     private final LoyaltyService loyaltyService;
+    private final RewardService rewardService;
 
     public FeedbackLoyaltySummaryResponse getFeedbackLoyaltySummary() {
         List<ReviewResponse> recentReviews = reviewService.findRecentReviews(5);
@@ -32,7 +32,7 @@ public class FeedbackLoyaltyService {
 
         // Clientes más leales y premios
         List<LoyalCustomerResponse> topLoyalCustomers = loyaltyService.getTopLoyalCustomers(3);
-        List<RewardResponse> availableRewards = loyaltyService.getAvailableRewards();
+        List<RewardResponse> availableRewards = rewardService.getAvailableRewards();
 
         return FeedbackLoyaltySummaryResponse.builder()
                 .recentReviews(recentReviews)

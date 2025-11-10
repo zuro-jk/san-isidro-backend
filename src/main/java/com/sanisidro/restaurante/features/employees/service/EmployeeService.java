@@ -10,8 +10,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.sanisidro.restaurante.core.aws.service.FileService;
 import com.sanisidro.restaurante.core.dto.response.PagedResponse;
+import com.sanisidro.restaurante.core.exceptions.EmailAlreadyExistsException;
+import com.sanisidro.restaurante.core.exceptions.UsernameAlreadyExistsException;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
+import com.sanisidro.restaurante.core.security.service.UserService;
 import com.sanisidro.restaurante.features.employees.dto.employee.request.EmployeeRequest;
 import com.sanisidro.restaurante.features.employees.dto.employee.response.EmployeeResponse;
 import com.sanisidro.restaurante.features.employees.model.Employee;
@@ -30,6 +33,7 @@ public class EmployeeService {
     private final UserRepository userRepository;
     private final PositionRepository positionRepository;
     private final FileService fileService;
+    private final UserService userService;
 
     public List<EmployeeResponse> getAll() {
         return employeeRepository.findByPositionNameNotIgnoreCase("SUPPLIER")
@@ -64,8 +68,21 @@ public class EmployeeService {
 
     @Transactional
     public EmployeeResponse create(EmployeeRequest request) {
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado con id: " + request.getUserId()));
+
+        if (request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new IllegalArgumentException("La contraseña es obligatoria para crear un empleado.");
+        }
+        if (request.getPassword().length() < 8) {
+            throw new IllegalArgumentException("La contraseña debe tener al menos 8 caracteres.");
+        }
+
+        User user = userService.createNewUser(
+                request.getUsername(),
+                request.getEmail(),
+                request.getPassword(),
+                request.getFirstName(),
+                request.getLastName(),
+                request.getPhone());
 
         Position position = positionRepository.findById(request.getPositionId())
                 .orElseThrow(
@@ -90,24 +107,43 @@ public class EmployeeService {
     public EmployeeResponse update(Long id, EmployeeRequest request) {
         Employee employee = findByIdOrThrow(id);
 
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado con id: " + request.getUserId()));
+        User user = employee.getUser();
+        if (user == null) {
+            throw new EntityNotFoundException("El empleado no tiene un usuario asociado.");
+        }
 
         Position position = positionRepository.findById(request.getPositionId())
                 .orElseThrow(
                         () -> new EntityNotFoundException("Puesto no encontrado con id: " + request.getPositionId()));
 
-        // sincronizar roles base sin perder extras
-        user.syncRolesWithPosition(position);
-        userRepository.save(user);
-
-        employee.setUser(user);
         employee.setPosition(position);
         employee.setSalary(request.getSalary());
         employee.setHireDate(request.getHireDate());
         employee.setStatus(request.getStatus());
 
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
+        user.setPhone(request.getPhone());
+
+        if (!user.getUsername().equals(request.getUsername())) {
+            if (userRepository.existsByUsername(request.getUsername())) {
+                throw new UsernameAlreadyExistsException("El nombre de usuario ya está en uso.");
+            }
+            user.setUsername(request.getUsername());
+        }
+        
+        if (!user.getEmail().equalsIgnoreCase(request.getEmail())) {
+            if (userRepository.existsByEmailIgnoreCase(request.getEmail())) {
+                throw new EmailAlreadyExistsException("El email ya está en uso.");
+            }
+            user.setEmail(request.getEmail());
+        }
+
+        user.syncRolesWithPosition(position);
+        
+        userRepository.save(user);
         Employee updated = employeeRepository.save(employee);
+        
         return mapToResponse(updated);
     }
 

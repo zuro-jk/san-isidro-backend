@@ -1,27 +1,35 @@
 package com.sanisidro.restaurante.features.customers.service;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.sanisidro.restaurante.core.aws.service.FileService;
 import com.sanisidro.restaurante.core.dto.response.PagedResponse;
 import com.sanisidro.restaurante.core.exceptions.CustomerAlreadyExistsException;
+import com.sanisidro.restaurante.core.exceptions.EmailAlreadyExistsException;
 import com.sanisidro.restaurante.core.exceptions.ResourceNotFoundException;
+import com.sanisidro.restaurante.core.exceptions.UsernameAlreadyExistsException;
 import com.sanisidro.restaurante.core.security.enums.AuthProvider;
+import com.sanisidro.restaurante.core.security.model.Role;
 import com.sanisidro.restaurante.core.security.model.User;
+import com.sanisidro.restaurante.core.security.repository.RoleRepository;
 import com.sanisidro.restaurante.core.security.repository.UserRepository;
 import com.sanisidro.restaurante.features.customers.dto.customer.request.CustomerRequest;
 import com.sanisidro.restaurante.features.customers.dto.customer.response.CustomerResponse;
-import com.sanisidro.restaurante.features.customers.dto.pointshistory.response.PointsHistoryResponse;
 import com.sanisidro.restaurante.features.customers.enums.PointHistoryEventType;
 import com.sanisidro.restaurante.features.customers.model.Customer;
-import com.sanisidro.restaurante.features.customers.model.PointsHistory;
 import com.sanisidro.restaurante.features.customers.repository.CustomerRepository;
+import com.sanisidro.restaurante.features.feedbackloyalty.dto.pointshistory.response.PointsHistoryResponse;
+import com.sanisidro.restaurante.features.feedbackloyalty.models.PointsHistory;
+import com.sanisidro.restaurante.features.feedbackloyalty.service.LoyaltyService;
+import com.sanisidro.restaurante.features.feedbackloyalty.service.PointsHistoryService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +44,9 @@ public class CustomerService {
     private final LoyaltyService loyaltyService;
     private final PointsHistoryService pointsHistoryService;
     private final FileService fileService;
+
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional(readOnly = true)
     public PagedResponse<CustomerResponse> getAllCustomers(Pageable pageable) {
@@ -76,16 +87,29 @@ public class CustomerService {
             user = userRepository.findById(dto.getUserId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
         } else {
+            if (userRepository.existsByUsername(dto.getUsername())) {
+                throw new UsernameAlreadyExistsException("Username ya existe");
+            }
+            if (userRepository.existsByEmailIgnoreCase(dto.getEmail())) {
+                throw new EmailAlreadyExistsException("Email ya existe");
+            }
+
+            Role clientRole = roleRepository.findByName("ROLE_CLIENT")
+                    .orElseThrow(() -> new RuntimeException("Rol ROLE_CLIENT no encontrado"));
+
             user = User.builder()
-                    .username(dto.getEmail())
+                    .username(dto.getUsername())
+                    .email(dto.getEmail())
+                    .password(passwordEncoder.encode(dto.getPassword()))
                     .firstName(dto.getFirstName())
                     .lastName(dto.getLastName())
-                    .email(dto.getEmail())
                     .phone(dto.getPhone())
-                    .provider(AuthProvider.LOCAL)
+                    .roles(Set.of(clientRole))
                     .enabled(true)
                     .emailVerified(true)
+                    .provider(AuthProvider.LOCAL)
                     .build();
+
             userRepository.save(user);
         }
 
@@ -101,8 +125,10 @@ public class CustomerService {
         Customer saved = customerRepository.save(customer);
         log.info("Cliente creado: {} ({})", saved.getId(), user.getUsername());
 
-        int points = loyaltyService.calculatePoints(saved, null, "Primer registro", 1);
-        pointsHistoryService.applyPoints(saved, points, PointHistoryEventType.EARNING);
+        if (dto.getUserId() == null) {
+            int points = loyaltyService.calculatePoints(saved, null, "Primer registro", 1);
+            pointsHistoryService.applyPoints(saved, points, PointHistoryEventType.EARNING);
+        }
 
         return mapToResponse(saved);
     }
@@ -116,14 +142,17 @@ public class CustomerService {
             user.setFirstName(dto.getFirstName());
         if (dto.getLastName() != null)
             user.setLastName(dto.getLastName());
-        if (dto.getEmail() != null)
-            user.setEmail(dto.getEmail());
         if (dto.getPhone() != null)
             user.setPhone(dto.getPhone());
 
-        userRepository.save(user);
-        customerRepository.save(customer);
+        if (dto.getEmail() != null && !user.getEmail().equalsIgnoreCase(dto.getEmail())) {
+            if (userRepository.existsByEmailIgnoreCase(dto.getEmail())) {
+                throw new EmailAlreadyExistsException("El email ya está en uso por otro usuario.");
+            }
+            user.setEmail(dto.getEmail());
+        }
 
+        userRepository.save(user);
         log.info("Cliente actualizado: {} ({})", customer.getId(), user.getUsername());
         return mapToResponse(customer);
     }
@@ -221,7 +250,6 @@ public class CustomerService {
                 .phone(user.getPhone())
                 .points(customer.getPoints())
 
-                // Datos extra del usuario
                 .enabled(user.isEnabled())
                 .emailVerified(user.isEmailVerified())
                 .roles(user.getRoles().stream()

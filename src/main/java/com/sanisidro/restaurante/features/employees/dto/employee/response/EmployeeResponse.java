@@ -25,6 +25,7 @@ public class EmployeeResponse {
   private String lastName;
   private String fullName;
   private String profileImageUrl;
+  private String phone;
 
   private Long positionId;
   private String positionName;
