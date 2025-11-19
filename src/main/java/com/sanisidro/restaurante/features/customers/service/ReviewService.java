@@ -49,6 +49,14 @@ public class ReviewService {
                 .collect(Collectors.toList());
     }
 
+    public List<ReviewResponse> getMeReviews(User user) {
+        Customer customer = customerRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado"));
+
+        return this.reviewRepository.findByCustomerId(customer.getId()).stream().map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
     public boolean hasCustomerReviewed(User user, Long orderId, Long productId, Long reservationId) {
         Customer customer = customerRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado"));

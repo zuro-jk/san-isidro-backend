@@ -15,12 +15,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.sanisidro.restaurante.core.exceptions.ResourceNotFoundException;
 import com.sanisidro.restaurante.core.security.dto.ApiResponse;
 import com.sanisidro.restaurante.core.security.model.User;
 import com.sanisidro.restaurante.features.customers.dto.review.request.ReviewRequest;
 import com.sanisidro.restaurante.features.customers.dto.review.response.ReviewResponse;
-import com.sanisidro.restaurante.features.customers.model.Customer;
 import com.sanisidro.restaurante.features.customers.service.ReviewService;
 
 import jakarta.validation.Valid;
@@ -37,6 +35,13 @@ public class ReviewController {
     public ResponseEntity<ApiResponse<ReviewResponse>> getReview(@PathVariable Long id) {
         ReviewResponse review = reviewService.getReview(id);
         return ResponseEntity.ok(new ApiResponse<>(true, "Reseña obtenida correctamente", review));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<List<ReviewResponse>>> getMeReviews(
+            @AuthenticationPrincipal User user) {
+        List<ReviewResponse> reviewResponses = reviewService.getMeReviews(user);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Mis reseñas obtenidas correctamente", reviewResponses));
     }
 
     @GetMapping("/customer/{customerId}")
